@@ -5,13 +5,18 @@ import static org.opensdg.protocol.Tunnel.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.ProtocolException;
 import java.net.Socket;
+import java.nio.channels.ClosedChannelException;
 
 import javax.xml.bind.DatatypeConverter;
 
+import org.eclipse.jdt.annotation.NonNull;
 import org.opensdg.protocol.Tunnel.COOKPacket;
 import org.opensdg.protocol.Tunnel.HELOPacket;
+import org.opensdg.protocol.Tunnel.MESGPacket;
 import org.opensdg.protocol.Tunnel.Packet;
+import org.opensdg.protocol.Tunnel.REDYPacket;
 import org.opensdg.protocol.Tunnel.TELLPacket;
 import org.opensdg.protocol.Tunnel.VOCHPacket;
 import org.opensdg.protocol.Tunnel.WELCPacket;
@@ -52,12 +57,64 @@ public class Connection {
     private byte[] beforeNm;
     private long nonce;
 
+    private DataHandler dataHandler;
+
     public void setPrivateKey(byte[] key) {
         clientPrivkey = key.clone();
         clientPubkey = SDG.calcPublicKey(clientPrivkey);
     }
 
-    public void connect(String host, int port) throws IOException {
+    public static class Endpoint {
+        String host;
+        int port;
+
+        Endpoint(String h, int p) {
+            host = h;
+            port = p;
+        }
+    };
+
+    private static final Endpoint danfoss_servers[] = { new Endpoint("77.66.11.90", 443),
+            new Endpoint("77.66.11.92", 443), new Endpoint("5.179.92.180", 443), new Endpoint("5.179.92.182", 443) };
+
+    public void connectToDanfoss() throws IOException {
+        connectToGrid(danfoss_servers);
+    }
+
+    public void connectToGrid(@NonNull Endpoint[] servers) throws IOException {
+        Endpoint[] list = servers.clone();
+        Endpoint[] randomized = new Endpoint[servers.length];
+
+        // Permute servers in random order in order to distribute the load
+        int left = servers.length;
+        for (int i = 0; i < servers.length; i++) {
+            int idx = (int) (Math.random() * left);
+
+            randomized[i] = list[idx];
+            left--;
+            list[idx] = list[left];
+        }
+
+        IOException lastErr = null;
+
+        dataHandler = new GridDataHandler(this);
+
+        for (int i = 0; i < servers.length; i++) {
+            try {
+                connect(randomized[i].host, randomized[i].port);
+                return;
+            } catch (IOException e) {
+                logger.debug("Failed to connect to {}:{}: {}", randomized[i].host, randomized[i].port, e.getMessage());
+                lastErr = e;
+            }
+        }
+
+        if (lastErr != null) {
+            throw lastErr;
+        }
+    }
+
+    protected void connect(String host, int port) throws IOException {
         s = new Socket(host, port);
         is = s.getInputStream();
         os = s.getOutputStream();
@@ -72,6 +129,10 @@ public class Connection {
         do {
             ret = receivePacket();
         } while (ret == 0);
+
+        if (ret == -1) {
+            throw new ClosedChannelException();
+        }
     }
 
     public void close() throws IOException {
@@ -146,9 +207,13 @@ public class Connection {
             sendPacket(new VOCHPacket(serverCookie, getNonce(), beforeNm, serverPubkey, clientPrivkey, clientPubkey,
                     tempPubkey, null));
             return 0;
+        } else if (cmd == CMD_REDY) {
+            return dataHandler.handleREDY(new REDYPacket(pkt, beforeNm));
+        } else if (cmd == CMD_MESG) {
+            return dataHandler.handleMESG(new MESGPacket(pkt, beforeNm));
         }
 
-        return 1;
+        throw new ProtocolException("Unknown packet received: " + pkt.toString());
     }
 
     private int receiveData() throws IOException {

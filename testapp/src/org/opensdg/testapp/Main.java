@@ -19,7 +19,7 @@ public class Main {
         grid.setPrivateKey(privKey);
 
         try {
-            grid.connect("77.66.11.90", 443);
+            grid.connectToDanfoss();
         } catch (IOException e) {
             System.out.println("Failed to connect to grid: " + e.getMessage());
             e.printStackTrace();

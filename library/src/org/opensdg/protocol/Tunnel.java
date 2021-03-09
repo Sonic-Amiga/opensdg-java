@@ -64,6 +64,13 @@ public class Tunnel {
         }
     }
 
+    private static void decrypt(byte[] m, byte[] c, byte[] n, byte[] k) throws ProtocolException {
+        int ret = curve25519xsalsa20poly1305.crypto_box_open_afternm(c, m, n, k);
+        if (ret != 0) {
+            throw new ProtocolException("Decryption failed, code " + ret);
+        }
+    }
+
     public static class Packet {
         public static final short HEADER_SIZE = 10;
         protected static final int MAGIC = 0xf09f909f;
@@ -154,6 +161,8 @@ public class Tunnel {
     public static final int CMD_HELO = CMD('H', 'E', 'L', 'O');
     public static final int CMD_COOK = CMD('C', 'O', 'O', 'K');
     public static final int CMD_VOCH = CMD('V', 'O', 'C', 'H');
+    public static final int CMD_REDY = CMD('R', 'E', 'D', 'Y');
+    public static final int CMD_MESG = CMD('M', 'E', 'S', 'G');
 
     public static class TELLPacket extends Packet {
         // TELL packet has no payload
@@ -212,7 +221,6 @@ public class Tunnel {
             data.get(msg, OUTER_PAD, BOX_SIZE);
 
             decrypt(msg, msg, box_nonce, serverPk, clientSk);
-
             decrypted = ByteBuffer.wrap(msg).order(ByteOrder.BIG_ENDIAN);
         }
 
@@ -279,6 +287,45 @@ public class Tunnel {
             data.put(cookie);
             data.putLong(nonce);
             data.put(outerMsg, OUTER_PAD, BOX_SIZE);
+        }
+    }
+
+    public static class DataPacket extends Packet {
+        int BOX_SIZE;
+
+        public DataPacket(Packet pkt, String noncePrefix, byte[] beforenm) throws ProtocolException {
+            super(pkt, SHORT_NONCE_SIZE);
+            BOX_SIZE = getDataLength() - SHORT_NONCE_SIZE;
+
+            byte[] box_nonce = buildShortTermNonce(noncePrefix, getNonce());
+            byte[] msg = new byte[OUTER_PAD + BOX_SIZE];
+
+            data.position(HEADER_SIZE + 8);
+            data.get(msg, OUTER_PAD, BOX_SIZE);
+
+            decrypt(msg, msg, box_nonce, beforenm);
+            decrypted = ByteBuffer.wrap(msg).order(ByteOrder.BIG_ENDIAN);
+        }
+
+        public long getNonce() {
+            return data.getLong(HEADER_SIZE);
+        }
+
+        public byte[] getPayload() {
+            return getDecryptedBytes(0, BOX_SIZE - INNER_PAD);
+        }
+    }
+
+    // REDY packet is identical to MESG with the only difference being nonce prefix
+    public static class REDYPacket extends DataPacket {
+        public REDYPacket(Packet pkt, byte[] beforenm) throws ProtocolException {
+            super(pkt, "CurveCP-server-R", beforenm);
+        }
+    }
+
+    public static class MESGPacket extends DataPacket {
+        public MESGPacket(Packet pkt, byte[] beforenm) throws ProtocolException {
+            super(pkt, "CurveCP-server-M", beforenm);
         }
     }
 }
