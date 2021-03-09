@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.opensdg</groupId>
+  <artifactId>testapp</artifactId>
+  <version>1.0</version>
+
+  <name>OpenSDG :: Java :: Test application</name>
+  
+  <dependencies>
+    <dependency>
+      <groupId>org.opensdg</groupId>
+      <artifactId>osdg_java</artifactId>
+      <version>1.0</version>
+    </dependency>
+	<dependency>
+	    <groupId>org.slf4j</groupId>
+	    <artifactId>slf4j-simple</artifactId>
+	    <version>1.7.0</version>
+	    <scope>runtime</scope>
+	</dependency>
+  </dependencies>
+  
+</project>
