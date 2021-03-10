@@ -1,5 +1,7 @@
 package org.opensdg.protocol;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.net.ProtocolException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -57,8 +59,8 @@ public class Tunnel {
         }
     }
 
-    private static void encrypt(byte[] m, byte[] c, byte[] n, byte[] k) throws ProtocolException {
-        int ret = curve25519xsalsa20poly1305.crypto_box_afternm(m, c, n, k);
+    private static void encrypt(byte[] c, byte[] m, byte[] n, byte[] k) throws ProtocolException {
+        int ret = curve25519xsalsa20poly1305.crypto_box_afternm(c, m, n, k);
         if (ret != 0) {
             throw new ProtocolException("Encryption failed, code " + ret);
         }
@@ -140,6 +142,13 @@ public class Tunnel {
             return ret;
         }
 
+        protected void allocateDecryptedData(int box_size) {
+            byte[] msg = new byte[OUTER_PAD + box_size];
+
+            decrypted = ByteBuffer.wrap(msg).order(ByteOrder.BIG_ENDIAN);
+            decrypted.position(OUTER_PAD + INNER_PAD);
+        }
+
         protected byte[] getDecryptedBytes(int start, int size) {
             byte[] ret = new byte[size];
 
@@ -205,17 +214,27 @@ public class Tunnel {
             data.putLong(nonce);
             data.put(zeroMsg, OUTER_PAD, ZEROMSG_SIZE);
         }
+
+        long getNonce() {
+            return data.getLong(HEADER_SIZE + SDG.KEY_SIZE);
+        }
+
+        @Override
+        public String toString() {
+            return super.toString() + " #" + getNonce();
+        }
     }
 
     public static class COOKPacket extends Packet {
-        private static final int BOX_DATA_SIZE = SDG.KEY_SIZE + COOKIE_SIZE;
-        private static final int BOX_SIZE = INNER_PAD + BOX_DATA_SIZE;
+        private static final int BOX_SIZE = INNER_PAD + SDG.KEY_SIZE + COOKIE_SIZE;
 
         public COOKPacket(Packet pkt, byte[] serverPk, byte[] clientSk) throws ProtocolException {
             super(pkt, LONG_NONCE_SIZE + BOX_SIZE);
 
+            allocateDecryptedData(BOX_SIZE);
+
+            byte[] msg = decrypted.array();
             byte[] box_nonce = buildLongTermNonce("CurveCPK", getNonce());
-            byte[] msg = new byte[OUTER_PAD + BOX_SIZE];
 
             data.position(HEADER_SIZE + LONG_NONCE_SIZE);
             data.get(msg, OUTER_PAD, BOX_SIZE);
@@ -247,11 +266,8 @@ public class Tunnel {
             // constructor, then calculates lengths, then calls allocateData() explicitly
             super();
 
-            int BOX_DATA_SIZE = SDG.KEY_SIZE + LONG_NONCE_SIZE + INNER_BOX_SIZE + 1;
-            if (certificate != null) {
-                BOX_DATA_SIZE += 14 + certificate.length;
-            }
-            int BOX_SIZE = INNER_PAD + BOX_DATA_SIZE;
+            int BOX_SIZE = INNER_PAD + SDG.KEY_SIZE + LONG_NONCE_SIZE + INNER_BOX_SIZE + 1
+                    + (certificate == null ? 0 : 14 + certificate.length);
 
             allocateData(COOKIE_SIZE + SHORT_NONCE_SIZE + BOX_SIZE, CMD_VOCH);
 
@@ -263,9 +279,7 @@ public class Tunnel {
 
             encrypt(innerMsg, innerMsg, box_nonce, serverPk, clientSk);
 
-            byte[] outer_box_nonce = buildShortTermNonce("CurveCP-client-I", nonce);
-            byte[] outerMsg = new byte[OUTER_PAD + BOX_SIZE];
-            decrypted = ByteBuffer.wrap(outerMsg, OUTER_PAD + INNER_PAD, BOX_DATA_SIZE).order(ByteOrder.BIG_ENDIAN);
+            allocateDecryptedData(BOX_SIZE);
 
             decrypted.put(clientPk);
             decrypted.put(long_nonce);
@@ -282,37 +296,52 @@ public class Tunnel {
                 decrypted.put(certificate); // The license key itself
             }
 
+            byte[] outer_box_nonce = buildShortTermNonce("CurveCP-client-I", nonce);
+            byte[] outerMsg = decrypted.array();
             encrypt(outerMsg, outerMsg, outer_box_nonce, beforenm);
 
             data.put(cookie);
             data.putLong(nonce);
             data.put(outerMsg, OUTER_PAD, BOX_SIZE);
         }
+
+        long getNonce() {
+            return data.getLong(HEADER_SIZE + COOKIE_SIZE);
+        }
+
+        @Override
+        public String toString() {
+            return super.toString() + " #" + getNonce();
+        }
     }
 
     public static class DataPacket extends Packet {
-        int BOX_SIZE;
+        protected DataPacket(int data_size, int cmd) {
+            super(data_size, cmd);
+        }
 
-        public DataPacket(Packet pkt, String noncePrefix, byte[] beforenm) throws ProtocolException {
+        protected DataPacket(Packet pkt, String noncePrefix, byte[] beforenm) throws ProtocolException {
             super(pkt, SHORT_NONCE_SIZE);
-            BOX_SIZE = getDataLength() - SHORT_NONCE_SIZE;
+            int BOX_SIZE = getDataLength() - SHORT_NONCE_SIZE;
+
+            allocateDecryptedData(BOX_SIZE);
 
             byte[] box_nonce = buildShortTermNonce(noncePrefix, getNonce());
-            byte[] msg = new byte[OUTER_PAD + BOX_SIZE];
+            byte[] msg = decrypted.array();
 
             data.position(HEADER_SIZE + 8);
             data.get(msg, OUTER_PAD, BOX_SIZE);
 
             decrypt(msg, msg, box_nonce, beforenm);
-            decrypted = ByteBuffer.wrap(msg).order(ByteOrder.BIG_ENDIAN);
         }
 
         public long getNonce() {
             return data.getLong(HEADER_SIZE);
         }
 
-        public byte[] getPayload() {
-            return getDecryptedBytes(0, BOX_SIZE - INNER_PAD);
+        @Override
+        public String toString() {
+            return super.toString() + " #" + getNonce();
         }
     }
 
@@ -321,11 +350,48 @@ public class Tunnel {
         public REDYPacket(Packet pkt, byte[] beforenm) throws ProtocolException {
             super(pkt, "CurveCP-server-R", beforenm);
         }
+
+        public int getPayloadLength() {
+            return getDataLength() - SHORT_NONCE_SIZE - INNER_PAD;
+        }
+
+        public byte[] getPayload() {
+            return getDecryptedBytes(0, getPayloadLength());
+        }
     }
 
     public static class MESGPacket extends DataPacket {
         public MESGPacket(Packet pkt, byte[] beforenm) throws ProtocolException {
             super(pkt, "CurveCP-server-M", beforenm);
+        }
+
+        public MESGPacket(long nonce, byte[] beforenm, byte[] payload) throws ProtocolException {
+            super(SHORT_NONCE_SIZE + INNER_PAD + 2 + payload.length, CMD_MESG);
+
+            int BOX_SIZE = INNER_PAD + 2 + payload.length;
+
+            allocateDecryptedData(BOX_SIZE);
+
+            decrypted.putShort((short) payload.length);
+            decrypted.put(payload);
+
+            byte[] box_nonce = buildShortTermNonce("CurveCP-client-M", nonce);
+            // We implement both getters and setters, so for consistency use
+            // another temporary buffer for encryption, despite it's a bit slow
+            byte[] encrypted = new byte[OUTER_PAD + BOX_SIZE];
+
+            encrypt(encrypted, decrypted.array(), box_nonce, beforenm);
+
+            data.putLong(nonce);
+            data.put(encrypted, OUTER_PAD, BOX_SIZE);
+        }
+
+        public short getPayloadLength() {
+            return decrypted.getShort(OUTER_PAD + INNER_PAD);
+        }
+
+        public InputStream getPayload() {
+            return new ByteArrayInputStream(decrypted.array(), OUTER_PAD + INNER_PAD + 2, getPayloadLength());
         }
     }
 }

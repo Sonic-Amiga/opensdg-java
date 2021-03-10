@@ -21,14 +21,14 @@ public class Main {
         try {
             grid.connectToDanfoss();
         } catch (IOException e) {
-            System.out.println("Failed to connect to grid: " + e.getMessage());
+            System.out.println("Failed to connect to grid");
             e.printStackTrace();
         }
 
         try {
             grid.close();
         } catch (IOException e) {
-            System.out.println("Failed to close the connection: " + e.getMessage());
+            System.out.println("Failed to close the connection");
             e.printStackTrace();
         }
     }

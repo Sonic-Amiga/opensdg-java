@@ -2,12 +2,12 @@ package org.opensdg.java;
 
 import static org.opensdg.protocol.Tunnel.*;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ProtocolException;
 import java.net.Socket;
-import java.nio.channels.ClosedChannelException;
 
 import javax.xml.bind.DatatypeConverter;
 
@@ -131,7 +131,7 @@ public class Connection {
         } while (ret == 0);
 
         if (ret == -1) {
-            throw new ClosedChannelException();
+            throw new EOFException("Connection closed by peer");
         }
     }
 
@@ -236,5 +236,9 @@ public class Connection {
 
     private long getNonce() {
         return nonce++;
+    }
+
+    void sendMESG(byte[] data) throws ProtocolException, IOException {
+        sendPacket(new MESGPacket(getNonce(), beforeNm, data));
     }
 }
