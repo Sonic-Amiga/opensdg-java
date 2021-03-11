@@ -38,7 +38,7 @@ public class Tunnel {
     // Some short aliases to avoid long lines
     // This zero padding in front of the message is required by the NaCl
     private static final int OUTER_PAD = curve25519xsalsa20poly1305.crypto_secretbox_BOXZEROBYTES;
-    // Actual encrypted messages also have padding in front
+    // Actual encrypted messages also have zero padding in front
     private static final int INNER_PAD = curve25519xsalsa20poly1305.crypto_secretbox_BOXZEROBYTES;
 
     private static final int SHORT_NONCE_SIZE = 8;
@@ -75,15 +75,10 @@ public class Tunnel {
 
     public static class Packet {
         public static final short HEADER_SIZE = 10;
-        protected static final int MAGIC = 0xf09f909f;
+        private static final int MAGIC = 0xf09f909f;
         protected ByteBuffer data;
-        protected ByteBuffer decrypted;
 
-        protected Packet() {
-
-        }
-
-        protected void allocateData(int data_size, int cmd) {
+        protected Packet(int data_size, int cmd) {
             int size = HEADER_SIZE + data_size;
 
             data = ByteBuffer.allocate(size).order(ByteOrder.BIG_ENDIAN);
@@ -94,10 +89,6 @@ public class Tunnel {
             data.putInt(MAGIC);
             // 6 - command
             data.putInt(cmd);
-        }
-
-        protected Packet(int data_size, int cmd) {
-            allocateData(data_size, cmd);
         }
 
         public Packet(byte[] raw_data) throws ProtocolException {
@@ -142,11 +133,31 @@ public class Tunnel {
             return ret;
         }
 
-        protected void allocateDecryptedData(int box_size) {
-            byte[] msg = new byte[OUTER_PAD + box_size];
+        @Override
+        public String toString() {
+            return new String(getBytes(6, 4));
+        }
+    }
 
-            decrypted = ByteBuffer.wrap(msg).order(ByteOrder.BIG_ENDIAN);
+    public static class EncryptedPacket extends Packet {
+        private int box_size;
+        protected ByteBuffer decrypted;
+
+        EncryptedPacket(int raw_portion_size, int encrypted_data_size, int cmd) {
+            super(raw_portion_size + INNER_PAD + encrypted_data_size, cmd);
+            allocateDecryptedBuffer(encrypted_data_size);
+            // Position to the beginning of usable decrypted data area for convenience
             decrypted.position(OUTER_PAD + INNER_PAD);
+        }
+
+        EncryptedPacket(Packet pkt, int raw_portion_size, int encrypted_data_size) throws ProtocolException {
+            super(pkt, raw_portion_size + INNER_PAD + encrypted_data_size);
+            allocateDecryptedBuffer(encrypted_data_size);
+        }
+
+        private void allocateDecryptedBuffer(int encrypted_data_size) {
+            box_size = INNER_PAD + encrypted_data_size;
+            decrypted = ByteBuffer.allocate(OUTER_PAD + box_size).order(ByteOrder.BIG_ENDIAN);
         }
 
         protected byte[] getDecryptedBytes(int start, int size) {
@@ -158,9 +169,25 @@ public class Tunnel {
             return ret;
         }
 
-        @Override
-        public String toString() {
-            return new String(getBytes(6, 4));
+        protected void putEncrypted(String nonce_prefix, long nonce, byte[] beforenm) throws ProtocolException {
+            byte[] box_nonce = buildShortTermNonce(nonce_prefix, nonce);
+            // We may implement both getters and setters, so for consistency use
+            // another temporary buffer for encryption, despite it's a bit slow.
+            // unfortunately jnacl doesn't allow to use ByteBuffers or ByteArrayStreams,
+            // neither it allows to specify offset into arrays.
+            byte[] encrypted = new byte[OUTER_PAD + box_size];
+
+            encrypt(encrypted, decrypted.array(), box_nonce, beforenm);
+            data.put(encrypted, OUTER_PAD, box_size);
+        }
+
+        protected byte[] fillDataToDecrypt(int box_offset) {
+            byte[] msg = decrypted.array();
+
+            data.position(HEADER_SIZE + box_offset);
+            data.get(msg, OUTER_PAD, box_size);
+
+            return msg;
         }
     }
 
@@ -201,6 +228,9 @@ public class Tunnel {
         public HELOPacket(byte[] serverPk, byte[] clientPk, byte[] clientSk, long nonce) throws ProtocolException {
             super(SDG.KEY_SIZE + SHORT_NONCE_SIZE + ZEROMSG_SIZE, CMD_HELO);
 
+            data.put(clientPk);
+            data.putLong(nonce);
+
             byte[] box_nonce = buildShortTermNonce("CurveCP-client-H", nonce);
             byte[] zeroMsg = new byte[OUTER_PAD + ZEROMSG_SIZE];
 
@@ -210,8 +240,6 @@ public class Tunnel {
             // Note that outer BOX_PAD is stripped and not sent
             encrypt(zeroMsg, zeroMsg, box_nonce, serverPk, clientSk);
 
-            data.put(clientPk);
-            data.putLong(nonce);
             data.put(zeroMsg, OUTER_PAD, ZEROMSG_SIZE);
         }
 
@@ -225,22 +253,14 @@ public class Tunnel {
         }
     }
 
-    public static class COOKPacket extends Packet {
-        private static final int BOX_SIZE = INNER_PAD + SDG.KEY_SIZE + COOKIE_SIZE;
-
+    public static class COOKPacket extends EncryptedPacket {
         public COOKPacket(Packet pkt, byte[] serverPk, byte[] clientSk) throws ProtocolException {
-            super(pkt, LONG_NONCE_SIZE + BOX_SIZE);
+            super(pkt, LONG_NONCE_SIZE, SDG.KEY_SIZE + COOKIE_SIZE);
 
-            allocateDecryptedData(BOX_SIZE);
-
-            byte[] msg = decrypted.array();
             byte[] box_nonce = buildLongTermNonce("CurveCPK", getNonce());
-
-            data.position(HEADER_SIZE + LONG_NONCE_SIZE);
-            data.get(msg, OUTER_PAD, BOX_SIZE);
+            byte[] msg = fillDataToDecrypt(LONG_NONCE_SIZE);
 
             decrypt(msg, msg, box_nonce, serverPk, clientSk);
-            decrypted = ByteBuffer.wrap(msg).order(ByteOrder.BIG_ENDIAN);
         }
 
         public byte[] getNonce() {
@@ -256,53 +276,55 @@ public class Tunnel {
         }
     }
 
-    public static class VOCHPacket extends Packet {
+    public static class VOCHPacket extends EncryptedPacket {
         private static final int INNER_BOX_SIZE = INNER_PAD + SDG.KEY_SIZE;
+        private static final String CERTIFICATE_PREFIX = "certificate";
+        private static final int CERTIFICATE_PREFIX_SIZE = CERTIFICATE_PREFIX.length() + 3;
 
         public VOCHPacket(byte[] cookie, long nonce, byte[] beforenm, byte[] serverPk, byte[] clientSk, byte[] clientPk,
                 byte[] clientTempPk, byte[] certificate) throws ProtocolException {
-            // HACK: "super" call must be on the first line, we aren't even allowed
-            // to assign some temporary values; so this packet uses empty parent
-            // constructor, then calculates lengths, then calls allocateData() explicitly
-            super();
-
-            int BOX_SIZE = INNER_PAD + SDG.KEY_SIZE + LONG_NONCE_SIZE + INNER_BOX_SIZE + 1
-                    + (certificate == null ? 0 : 14 + certificate.length);
-
-            allocateData(COOKIE_SIZE + SHORT_NONCE_SIZE + BOX_SIZE, CMD_VOCH);
+            super(COOKIE_SIZE + SHORT_NONCE_SIZE, SDG.KEY_SIZE + LONG_NONCE_SIZE + INNER_BOX_SIZE + 1
+                    + (certificate == null ? 0 : (CERTIFICATE_PREFIX_SIZE + certificate.length)), CMD_VOCH);
 
             byte[] long_nonce = SDG.randomBytes(LONG_NONCE_SIZE);
             byte[] box_nonce = buildLongTermNonce("CurveCPV", long_nonce);
-
             byte[] innerMsg = new byte[OUTER_PAD + INNER_BOX_SIZE];
+
+            // Don't bother about ByteBuffer because inner data is all just byte[]
             System.arraycopy(clientTempPk, 0, innerMsg, OUTER_PAD + INNER_PAD, SDG.KEY_SIZE);
-
             encrypt(innerMsg, innerMsg, box_nonce, serverPk, clientSk);
-
-            allocateDecryptedData(BOX_SIZE);
 
             decrypted.put(clientPk);
             decrypted.put(long_nonce);
             decrypted.put(innerMsg, OUTER_PAD, INNER_BOX_SIZE);
 
+            /*
+             * License key is appended to VOCH packet in a form of key-value pair.
+             * Unlike MESG this is not protobuf, but a fixed structure. An empty
+             * license key is reported as all zeroes.
+             * Actually the grid (at least DEVISmart one) accepts VOCH packets
+             * without this optional data just fine, but we fully replicate the
+             * original library just in case, for better compatibility.
+             */
             if (certificate == null) {
                 decrypted.put((byte) 0);
             } else {
-                decrypted.put((byte) 1); // Presence flag
-                decrypted.put((byte) 11); // Length of the following string without trailing NULL
-                decrypted.put("certificate".getBytes()); // NULL-terminated string "certificate"
+                // 1 byte - Presence flag
+                decrypted.put((byte) 1);
+                // 1 byte - Length of the following string without trailing NULL
+                decrypted.put((byte) CERTIFICATE_PREFIX.length());
+                // 12 bytes - NULL-terminated string
+                decrypted.put(CERTIFICATE_PREFIX.getBytes());
                 decrypted.put((byte) 0);
-                decrypted.put((byte) certificate.length); // Length of the license key
-                decrypted.put(certificate); // The license key itself
+                // 1 byte - Length of the license key
+                decrypted.put((byte) certificate.length);
+                // The license key itself
+                decrypted.put(certificate);
             }
-
-            byte[] outer_box_nonce = buildShortTermNonce("CurveCP-client-I", nonce);
-            byte[] outerMsg = decrypted.array();
-            encrypt(outerMsg, outerMsg, outer_box_nonce, beforenm);
 
             data.put(cookie);
             data.putLong(nonce);
-            data.put(outerMsg, OUTER_PAD, BOX_SIZE);
+            putEncrypted("CurveCP-client-I", nonce, beforenm);
         }
 
         long getNonce() {
@@ -315,22 +337,16 @@ public class Tunnel {
         }
     }
 
-    public static class DataPacket extends Packet {
-        protected DataPacket(int data_size, int cmd) {
-            super(data_size, cmd);
+    public static class DataPacket extends EncryptedPacket {
+        protected DataPacket(int raw_portion_size, int encrypted_data_size, int cmd) {
+            super(raw_portion_size, encrypted_data_size, cmd);
         }
 
         protected DataPacket(Packet pkt, String noncePrefix, byte[] beforenm) throws ProtocolException {
-            super(pkt, SHORT_NONCE_SIZE);
-            int BOX_SIZE = getDataLength() - SHORT_NONCE_SIZE;
-
-            allocateDecryptedData(BOX_SIZE);
+            super(pkt, SHORT_NONCE_SIZE, pkt.getDataLength() - SHORT_NONCE_SIZE - INNER_PAD);
 
             byte[] box_nonce = buildShortTermNonce(noncePrefix, getNonce());
-            byte[] msg = decrypted.array();
-
-            data.position(HEADER_SIZE + 8);
-            data.get(msg, OUTER_PAD, BOX_SIZE);
+            byte[] msg = fillDataToDecrypt(SHORT_NONCE_SIZE);
 
             decrypt(msg, msg, box_nonce, beforenm);
         }
@@ -366,24 +382,14 @@ public class Tunnel {
         }
 
         public MESGPacket(long nonce, byte[] beforenm, byte[] payload) throws ProtocolException {
-            super(SHORT_NONCE_SIZE + INNER_PAD + 2 + payload.length, CMD_MESG);
-
-            int BOX_SIZE = INNER_PAD + 2 + payload.length;
-
-            allocateDecryptedData(BOX_SIZE);
+            // Payload is prefixed by its length, yes, again
+            super(SHORT_NONCE_SIZE, 2 + payload.length, CMD_MESG);
 
             decrypted.putShort((short) payload.length);
             decrypted.put(payload);
 
-            byte[] box_nonce = buildShortTermNonce("CurveCP-client-M", nonce);
-            // We implement both getters and setters, so for consistency use
-            // another temporary buffer for encryption, despite it's a bit slow
-            byte[] encrypted = new byte[OUTER_PAD + BOX_SIZE];
-
-            encrypt(encrypted, decrypted.array(), box_nonce, beforenm);
-
             data.putLong(nonce);
-            data.put(encrypted, OUTER_PAD, BOX_SIZE);
+            putEncrypted("CurveCP-client-M", nonce, beforenm);
         }
 
         public short getPayloadLength() {
