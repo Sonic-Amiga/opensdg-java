@@ -91,11 +91,11 @@ public class Tunnel {
             data.putInt(cmd);
         }
 
-        public Packet(byte[] raw_data) throws ProtocolException {
-            if (raw_data.length < HEADER_SIZE) {
+        public Packet(ByteBuffer buffer) throws ProtocolException {
+            data = buffer.order(ByteOrder.BIG_ENDIAN);
+            if (data.capacity() < HEADER_SIZE) {
                 throw new ProtocolException("Invalid packet received, too short");
             }
-            data = ByteBuffer.wrap(raw_data).order(ByteOrder.BIG_ENDIAN);
             if (getMagic() != MAGIC) {
                 throw new ProtocolException("Invalid packet received, bad magic");
             }
@@ -108,8 +108,8 @@ public class Tunnel {
             data = pkt.data;
         }
 
-        public byte[] getData() {
-            return data.array();
+        public ByteBuffer getData() {
+            return data;
         }
 
         public int getDataLength() {

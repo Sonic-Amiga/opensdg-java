@@ -4,10 +4,12 @@ import static org.opensdg.protocol.Tunnel.*;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.net.InetSocketAddress;
 import java.net.ProtocolException;
-import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.channels.AsynchronousSocketChannel;
+import java.util.concurrent.ExecutionException;
 
 import javax.xml.bind.DatatypeConverter;
 
@@ -41,12 +43,10 @@ public class Connection {
         }
     }
 
-    private Socket s;
-    private InputStream is;
-    private OutputStream os;
+    private AsynchronousSocketChannel s;
 
-    private byte[] receiveBuffer;
-    private int bytesLeft;
+    private ByteBuffer receiveBuffer;
+    private short bytesLeft;
     private int bytesReceived;
 
     private byte[] clientPubkey;
@@ -77,11 +77,12 @@ public class Connection {
     private static final Endpoint danfoss_servers[] = { new Endpoint("77.66.11.90", 443),
             new Endpoint("77.66.11.92", 443), new Endpoint("5.179.92.180", 443), new Endpoint("5.179.92.182", 443) };
 
-    public void connectToDanfoss() throws IOException {
+    public void connectToDanfoss() throws IOException, InterruptedException, ExecutionException {
         connectToGrid(danfoss_servers);
     }
 
-    public void connectToGrid(@NonNull Endpoint[] servers) throws IOException {
+    public void connectToGrid(@NonNull Endpoint[] servers)
+            throws IOException, InterruptedException, ExecutionException {
         Endpoint[] list = servers.clone();
         Endpoint[] randomized = new Endpoint[servers.length];
 
@@ -114,10 +115,9 @@ public class Connection {
         }
     }
 
-    protected void connect(String host, int port) throws IOException {
-        s = new Socket(host, port);
-        is = s.getInputStream();
-        os = s.getOutputStream();
+    protected void connect(String host, int port) throws IOException, InterruptedException, ExecutionException {
+        s = AsynchronousSocketChannel.open();
+        s.connect(new InetSocketAddress(host, port)).get();
 
         logger.debug("Connected to {}:{}", host, port);
 
@@ -136,20 +136,21 @@ public class Connection {
     }
 
     public void close() throws IOException {
-        os.close();
-        is.close();
         s.close();
     }
 
-    private void sendPacket(Packet pkt) throws IOException {
+    private void sendPacket(Packet pkt) throws IOException, InterruptedException, ExecutionException {
         logger.trace("Sending packet: {}", pkt);
-        os.write(pkt.getData());
+        ByteBuffer data = pkt.getData();
+
+        data.position(0);
+        s.write(data).get();
     }
 
-    private int receivePacket() throws IOException {
+    private int receivePacket() throws IOException, InterruptedException, ExecutionException {
         if (receiveBuffer == null) {
             // Every packet is prefixed with length, read it first
-            receiveBuffer = new byte[2];
+            receiveBuffer = ByteBuffer.allocate(2);
             bytesReceived = 0;
             bytesLeft = 2;
         }
@@ -157,15 +158,13 @@ public class Connection {
         int ret = receiveData();
 
         if (ret == 2) { // Received 2 bytes, length of the buffer
-            byte[] size_buffer = receiveBuffer;
-
+            receiveBuffer.order(ByteOrder.BIG_ENDIAN);
             // Data size is bigendian
-            bytesLeft = (Byte.toUnsignedInt(receiveBuffer[0]) << 8) | Byte.toUnsignedInt(receiveBuffer[1]);
+            bytesLeft = receiveBuffer.getShort(0);
 
             // Reallocate our buffer with the new size
-            receiveBuffer = new byte[2 + bytesLeft];
-            receiveBuffer[0] = size_buffer[0];
-            receiveBuffer[1] = size_buffer[1];
+            receiveBuffer = ByteBuffer.allocate(2 + bytesLeft);
+            receiveBuffer.putShort(bytesLeft);
 
             ret = receiveData();
         }
@@ -216,9 +215,9 @@ public class Connection {
         throw new ProtocolException("Unknown packet received: " + pkt.toString());
     }
 
-    private int receiveData() throws IOException {
+    private int receiveData() throws IOException, InterruptedException, ExecutionException {
         while (bytesLeft > 0) {
-            int ret = is.read(receiveBuffer, bytesReceived, bytesLeft);
+            int ret = s.read(receiveBuffer).get();
 
             if (ret == -1) {
                 logger.debug("Connection closed by peer");
@@ -238,7 +237,7 @@ public class Connection {
         return nonce++;
     }
 
-    void sendMESG(byte[] data) throws ProtocolException, IOException {
+    void sendMESG(byte[] data) throws ProtocolException, IOException, InterruptedException, ExecutionException {
         sendPacket(new MESGPacket(getNonce(), beforeNm, data));
     }
 }

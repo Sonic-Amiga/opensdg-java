@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ProtocolException;
+import java.util.concurrent.ExecutionException;
 
 import org.opensdg.protocol.Control;
 import org.opensdg.protocol.Tunnel.MESGPacket;
@@ -23,7 +24,7 @@ public class GridDataHandler extends DataHandler {
     }
 
     @Override
-    int handleREDY(REDYPacket pkt) throws IOException {
+    int handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException {
         // REDY payload from DEVISmart cloud is empty, nothing to do with it.
         logger.trace("REDY payload: {}", pkt.getPayload());
 
@@ -73,7 +74,7 @@ public class GridDataHandler extends DataHandler {
         }
     }
 
-    private void sendMESG(byte cmd, AbstractMessage msg) throws IOException {
+    private void sendMESG(byte cmd, AbstractMessage msg) throws IOException, InterruptedException, ExecutionException {
         ByteArrayOutputStream out = new ByteArrayOutputStream(1 + msg.getSerializedSize());
 
         // The protobuf contents is prefixed by a packet ID

@@ -22,7 +22,7 @@ public class Main {
 
         try {
             grid.connectToDanfoss();
-        } catch (IOException e) {
+        } catch (Exception e) {
             printError("Failed to connect to grid", e);
             return;
         }
