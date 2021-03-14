@@ -127,7 +127,7 @@ public class Connection {
 
         int ret;
         do {
-            ret = receivePacket();
+            ret = receiveData();
         } while (ret == 0);
 
         if (ret == -1) {
@@ -144,20 +144,24 @@ public class Connection {
         ByteBuffer data = pkt.getData();
 
         data.position(0);
-        s.write(data).get();
+
+        int size = data.capacity();
+
+        while (size > 0) {
+            int ret = s.write(data).get();
+            size -= ret;
+        }
     }
 
-    private int receivePacket() throws IOException, InterruptedException, ExecutionException {
-        if (receiveBuffer == null) {
-            // Every packet is prefixed with length, read it first
-            receiveBuffer = ByteBuffer.allocate(2);
-            bytesReceived = 0;
-            bytesLeft = 2;
+    private int onDataReceived(int size) throws IOException, InterruptedException, ExecutionException {
+        bytesReceived += size;
+        bytesLeft -= size;
+
+        if (bytesLeft > 0) {
+            return 0;
         }
 
-        int ret = receiveData();
-
-        if (ret == 2) { // Received 2 bytes, length of the buffer
+        if (bytesReceived == 2) { // Received 2 bytes, length of the buffer
             receiveBuffer.order(ByteOrder.BIG_ENDIAN);
             // Data size is bigendian
             bytesLeft = receiveBuffer.getShort(0);
@@ -166,11 +170,7 @@ public class Connection {
             receiveBuffer = ByteBuffer.allocate(2 + bytesLeft);
             receiveBuffer.putShort(bytesLeft);
 
-            ret = receiveData();
-        }
-
-        if (ret <= 0) {
-            return ret;
+            return 0;
         }
 
         Packet pkt = new Packet(receiveBuffer);
@@ -216,21 +216,22 @@ public class Connection {
     }
 
     private int receiveData() throws IOException, InterruptedException, ExecutionException {
-        while (bytesLeft > 0) {
-            int ret = s.read(receiveBuffer).get();
-
-            if (ret == -1) {
-                logger.debug("Connection closed by peer");
-                return -1;
-            }
-
-            // TODO: Support non-blocking mode
-
-            bytesReceived += ret;
-            bytesLeft -= ret;
+        if (receiveBuffer == null) {
+            // Start receiving a new packet.
+            // Every packet is prefixed with length, read it first
+            receiveBuffer = ByteBuffer.allocate(2);
+            bytesReceived = 0;
+            bytesLeft = 2;
         }
 
-        return bytesReceived;
+        int ret = s.read(receiveBuffer).get();
+
+        if (ret == -1) {
+            logger.debug("Connection closed by peer");
+            return -1;
+        }
+
+        return onDataReceived(ret);
     }
 
     private long getNonce() {
