@@ -15,5 +15,5 @@ public abstract class DataHandler {
 
     abstract int handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException;
 
-    abstract int handleMESG(MESGPacket pkt) throws IOException;
+    abstract int handleMESG(MESGPacket pkt) throws IOException, InterruptedException, ExecutionException;
 }

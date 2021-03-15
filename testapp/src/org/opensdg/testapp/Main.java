@@ -27,6 +27,8 @@ public class Main {
             return;
         }
 
+        System.out.println("Grid connection established");
+
         BufferedReader console = new BufferedReader(new InputStreamReader(System.in));
         String cmd = "";
 

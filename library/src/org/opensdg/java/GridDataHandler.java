@@ -4,13 +4,15 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ProtocolException;
+import java.util.Calendar;
 import java.util.concurrent.ExecutionException;
 
 import org.opensdg.protocol.Control;
 import org.opensdg.protocol.Tunnel.MESGPacket;
 import org.opensdg.protocol.Tunnel.REDYPacket;
+import org.opensdg.protocol.generated.ControlProtocol.Ping;
+import org.opensdg.protocol.generated.ControlProtocol.Pong;
 import org.opensdg.protocol.generated.ControlProtocol.ProtocolVersion;
-import org.opensdg.protocol.generated.ControlProtocol.ProtocolVersion.Builder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,6 +20,10 @@ import com.google.protobuf.AbstractMessage;
 
 public class GridDataHandler extends DataHandler {
     private final Logger logger = LoggerFactory.getLogger(GridDataHandler.class);
+
+    int pingSequence = 0;
+    int pingDelay = -1;
+    long lastPing;
 
     GridDataHandler(Connection conn) {
         super(conn);
@@ -32,7 +38,7 @@ public class GridDataHandler extends DataHandler {
         // probably optional. But let's do them just in case, to be as close
         // to original implementation as possible.
         // So let's do protocol version handshake
-        Builder protocolVer = ProtocolVersion.newBuilder();
+        ProtocolVersion.Builder protocolVer = ProtocolVersion.newBuilder();
 
         protocolVer.setMagic(Control.PROTOCOL_VERSION_MAGIC);
         protocolVer.setMajor(Control.PROTOCOL_VERSION_MAJOR);
@@ -43,7 +49,7 @@ public class GridDataHandler extends DataHandler {
     }
 
     @Override
-    int handleMESG(MESGPacket pkt) throws IOException {
+    int handleMESG(MESGPacket pkt) throws IOException, InterruptedException, ExecutionException {
         InputStream data = pkt.getPayload();
         int msgType = data.read();
 
@@ -63,15 +69,31 @@ public class GridDataHandler extends DataHandler {
                 }
 
                 logger.debug("Using protocol version {}.{}", major, minor);
+
+                ping();
+                connection.asyncReceive();
+
                 return 1;
 
-            case -1:
-                return -1; // EOF
+            case Control.MSG_PONG:
+                Pong pong = Pong.parseFrom(data);
+
+                if (pong.getSeq() == pingSequence - 1) {
+                    pingDelay = (int) (Calendar.getInstance().getTimeInMillis() - lastPing);
+                    logger.debug("PING roundtrip {} ms", pingDelay);
+                }
+
+                break;
+
+            case -1: // EOF while reading the payload
+                throw new ProtocolException("MESG with no body");
 
             default:
                 logger.warn("Unhandled grid message type {}", msgType);
-                return 0;
+                break;
         }
+
+        return 0;
     }
 
     private void sendMESG(byte cmd, AbstractMessage msg) throws IOException, InterruptedException, ExecutionException {
@@ -82,5 +104,18 @@ public class GridDataHandler extends DataHandler {
         msg.writeTo(out);
 
         connection.sendMESG(out.toByteArray());
+    }
+
+    private void ping() throws IOException, InterruptedException, ExecutionException {
+        Ping.Builder ping = Ping.newBuilder();
+
+        ping.setSeq(pingSequence++);
+        if (pingDelay != -1) {
+            ping.setDelay(pingDelay);
+        }
+
+        lastPing = Calendar.getInstance().getTimeInMillis();
+
+        sendMESG(Control.MSG_PING, ping.build());
     }
 }

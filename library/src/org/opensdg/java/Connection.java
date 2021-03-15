@@ -9,6 +9,7 @@ import java.net.ProtocolException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.AsynchronousSocketChannel;
+import java.nio.channels.CompletionHandler;
 import java.util.concurrent.ExecutionException;
 
 import javax.xml.bind.DatatypeConverter;
@@ -43,6 +44,23 @@ public class Connection {
         }
     }
 
+    private static class ReadHandler implements CompletionHandler<Integer, Connection> {
+        @Override
+        public void completed(Integer result, Connection conn) {
+            try {
+                conn.onDataReceived(result);
+                conn.asyncReceive();
+            } catch (IOException | InterruptedException | ExecutionException e) {
+                conn.onError(e);
+            }
+        }
+
+        @Override
+        public void failed(Throwable exc, Connection conn) {
+            conn.onError(exc);
+        }
+    }
+
     private AsynchronousSocketChannel s;
 
     private ByteBuffer receiveBuffer;
@@ -57,6 +75,7 @@ public class Connection {
     private byte[] beforeNm;
     private long nonce;
 
+    private CompletionHandler<Integer, Connection> readHandler = new ReadHandler();
     private DataHandler dataHandler;
 
     public void setPrivateKey(byte[] key) {
@@ -127,7 +146,7 @@ public class Connection {
 
         int ret;
         do {
-            ret = receiveData();
+            ret = blockingReceive();
         } while (ret == 0);
 
         if (ret == -1) {
@@ -154,6 +173,10 @@ public class Connection {
     }
 
     private int onDataReceived(int size) throws IOException, InterruptedException, ExecutionException {
+        if (size == -1) {
+            throw new EOFException("Connection closed by peer");
+        }
+
         bytesReceived += size;
         bytesLeft -= size;
 
@@ -215,7 +238,7 @@ public class Connection {
         throw new ProtocolException("Unknown packet received: " + pkt.toString());
     }
 
-    private int receiveData() throws IOException, InterruptedException, ExecutionException {
+    private void getBuffer() {
         if (receiveBuffer == null) {
             // Start receiving a new packet.
             // Every packet is prefixed with length, read it first
@@ -223,15 +246,18 @@ public class Connection {
             bytesReceived = 0;
             bytesLeft = 2;
         }
+    }
 
+    private int blockingReceive() throws IOException, InterruptedException, ExecutionException {
+        getBuffer();
         int ret = s.read(receiveBuffer).get();
 
-        if (ret == -1) {
-            logger.debug("Connection closed by peer");
-            return -1;
-        }
-
         return onDataReceived(ret);
+    }
+
+    void asyncReceive() {
+        getBuffer();
+        s.read(receiveBuffer, this, readHandler);
     }
 
     private long getNonce() {
@@ -240,5 +266,9 @@ public class Connection {
 
     void sendMESG(byte[] data) throws ProtocolException, IOException, InterruptedException, ExecutionException {
         sendPacket(new MESGPacket(getNonce(), beforeNm, data));
+    }
+
+    protected void onError(Throwable exc) {
+        logger.error("Unhandled async I/O error: {}", exc.getMessage());
     }
 }
