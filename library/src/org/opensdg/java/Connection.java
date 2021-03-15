@@ -8,6 +8,7 @@ import java.net.InetSocketAddress;
 import java.net.ProtocolException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.channels.CompletionHandler;
 import java.util.concurrent.ExecutionException;
@@ -48,17 +49,25 @@ public class Connection {
         @Override
         public void completed(Integer result, Connection conn) {
             try {
-                conn.onDataReceived(result);
+                int ret = conn.onDataReceived(result);
+
+                if (ret == -1) {
+                    conn.handleError(getEOFException());
+                }
                 conn.asyncReceive();
             } catch (IOException | InterruptedException | ExecutionException e) {
-                conn.onError(e);
+                conn.handleError(e);
             }
         }
 
         @Override
         public void failed(Throwable exc, Connection conn) {
-            conn.onError(exc);
+            conn.handleError(exc);
         }
+    }
+
+    private static EOFException getEOFException() {
+        return new EOFException("Connection closed by peer");
     }
 
     private AsynchronousSocketChannel s;
@@ -77,6 +86,8 @@ public class Connection {
 
     private CompletionHandler<Integer, Connection> readHandler = new ReadHandler();
     private DataHandler dataHandler;
+
+    private int pingInterval = 30;
 
     public void setPrivateKey(byte[] key) {
         clientPrivkey = key.clone();
@@ -150,7 +161,7 @@ public class Connection {
         } while (ret == 0);
 
         if (ret == -1) {
-            throw new EOFException("Connection closed by peer");
+            throw getEOFException();
         }
     }
 
@@ -174,7 +185,7 @@ public class Connection {
 
     private int onDataReceived(int size) throws IOException, InterruptedException, ExecutionException {
         if (size == -1) {
-            throw new EOFException("Connection closed by peer");
+            return -1;
         }
 
         bytesReceived += size;
@@ -214,7 +225,6 @@ public class Connection {
             logger.trace("Created short-term secret key: {}", new Hexdump(tempPrivkey));
 
             sendPacket(new HELOPacket(serverPubkey, tempPubkey, tempPrivkey, getNonce()));
-            return 0;
         } else if (cmd == CMD_COOK) {
             COOKPacket cook = new COOKPacket(pkt, serverPubkey, tempPrivkey);
             byte[] tempServerPubkey = cook.getShortTermPubkey();
@@ -228,14 +238,15 @@ public class Connection {
 
             sendPacket(new VOCHPacket(serverCookie, getNonce(), beforeNm, serverPubkey, clientPrivkey, clientPubkey,
                     tempPubkey, null));
-            return 0;
         } else if (cmd == CMD_REDY) {
             return dataHandler.handleREDY(new REDYPacket(pkt, beforeNm));
         } else if (cmd == CMD_MESG) {
             return dataHandler.handleMESG(new MESGPacket(pkt, beforeNm));
+        } else {
+            throw new ProtocolException("Unknown packet received: " + pkt.toString());
         }
 
-        throw new ProtocolException("Unknown packet received: " + pkt.toString());
+        return 0;
     }
 
     private void getBuffer() {
@@ -268,7 +279,38 @@ public class Connection {
         sendPacket(new MESGPacket(getNonce(), beforeNm, data));
     }
 
+    private void handleError(Throwable exc) {
+        if (exc instanceof AsynchronousCloseException) {
+            // This is not really an error, just someone has called close()
+            // during pending read
+            logger.debug("Async channel closed");
+        } else {
+            onError(exc);
+        }
+    }
+
     protected void onError(Throwable exc) {
-        logger.error("Unhandled async I/O error: {}", exc.getMessage());
+        // It's strongly adviced to handle these events, so let's log under error
+        // if the developer forgot to do so.
+        logger.error("Unhandled async I/O error:", exc);
+    }
+
+    /**
+     * Gets current ping interval in seconds
+     *
+     * @return number of seconds
+     */
+    public int getPingInterval() {
+        return pingInterval;
+    }
+
+    /**
+     * Sets ping interval in seconds. The new interval will be applied
+     * after the next pending ping is sent.
+     *
+     * @param seconds new ping interval is seconds
+     */
+    public void setPingInterval(int seconds) {
+        pingInterval = seconds;
     }
 }

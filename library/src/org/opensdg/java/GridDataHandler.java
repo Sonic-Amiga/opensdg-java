@@ -6,6 +6,9 @@ import java.io.InputStream;
 import java.net.ProtocolException;
 import java.util.Calendar;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.opensdg.protocol.Control;
 import org.opensdg.protocol.Tunnel.MESGPacket;
@@ -24,6 +27,20 @@ public class GridDataHandler extends DataHandler {
     int pingSequence = 0;
     int pingDelay = -1;
     long lastPing;
+
+    ScheduledExecutorService pingScheduler = Executors.newScheduledThreadPool(1);
+
+    private Runnable pingTask = new Runnable() {
+        @Override
+        public void run() {
+            try {
+                GridDataHandler.this.ping();
+            } catch (IOException | InterruptedException | ExecutionException e) {
+                // TODO Auto-generated catch block
+                GridDataHandler.this.connection.onError(e);
+            }
+        }
+    };
 
     GridDataHandler(Connection conn) {
         super(conn);
@@ -72,8 +89,7 @@ public class GridDataHandler extends DataHandler {
 
                 ping();
                 connection.asyncReceive();
-
-                return 1;
+                return 1; // This breaks the blocking read loop in connect()
 
             case Control.MSG_PONG:
                 Pong pong = Pong.parseFrom(data);
@@ -83,10 +99,11 @@ public class GridDataHandler extends DataHandler {
                     logger.debug("PING roundtrip {} ms", pingDelay);
                 }
 
+                pingScheduler.schedule(pingTask, connection.getPingInterval(), TimeUnit.SECONDS);
                 break;
 
-            case -1: // EOF while reading the payload
-                throw new ProtocolException("MESG with no body");
+            case -1: // EOF while reading the payload, this really shouldn't happen
+                throw new ProtocolException("empty MESG received");
 
             default:
                 logger.warn("Unhandled grid message type {}", msgType);
