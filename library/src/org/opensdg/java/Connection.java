@@ -166,7 +166,19 @@ public class Connection {
     }
 
     public void close() throws IOException {
-        s.close();
+        DataHandler handler = dataHandler;
+        dataHandler = null;
+
+        if (handler != null) {
+            handler.handleClose();
+        }
+
+        AsynchronousSocketChannel ch = s;
+        s = null;
+
+        if (ch != null) {
+            ch.close();
+        }
     }
 
     private void sendPacket(Packet pkt) throws IOException, InterruptedException, ExecutionException {

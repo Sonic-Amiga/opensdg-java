@@ -8,6 +8,7 @@ import java.util.Calendar;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.opensdg.protocol.Control;
@@ -29,10 +30,13 @@ public class GridDataHandler extends DataHandler {
     long lastPing;
 
     ScheduledExecutorService pingScheduler = Executors.newScheduledThreadPool(1);
+    ScheduledFuture<?> scheduledPing;
 
     private Runnable pingTask = new Runnable() {
         @Override
         public void run() {
+            GridDataHandler.this.scheduledPing = null;
+
             try {
                 GridDataHandler.this.ping();
             } catch (IOException | InterruptedException | ExecutionException e) {
@@ -99,7 +103,7 @@ public class GridDataHandler extends DataHandler {
                     logger.debug("PING roundtrip {} ms", pingDelay);
                 }
 
-                pingScheduler.schedule(pingTask, connection.getPingInterval(), TimeUnit.SECONDS);
+                scheduledPing = pingScheduler.schedule(pingTask, connection.getPingInterval(), TimeUnit.SECONDS);
                 break;
 
             case -1: // EOF while reading the payload, this really shouldn't happen
@@ -134,5 +138,17 @@ public class GridDataHandler extends DataHandler {
         lastPing = Calendar.getInstance().getTimeInMillis();
 
         sendMESG(Control.MSG_PING, ping.build());
+    }
+
+    @Override
+    void handleClose() {
+        ScheduledFuture<?> pendingPing = scheduledPing;
+        scheduledPing = null;
+
+        if (pendingPing != null) {
+            pendingPing.cancel(true);
+        }
+
+        pingScheduler.shutdown();
     }
 }
