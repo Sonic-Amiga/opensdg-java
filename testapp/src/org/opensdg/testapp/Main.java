@@ -1,8 +1,12 @@
 package org.opensdg.testapp;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 
 import org.opensdg.java.Connection;
 import org.opensdg.java.SDG;
@@ -14,8 +18,31 @@ public class Main {
         System.setProperty("org.slf4j.simplelogger.defaultlog", "trace");
     }
 
+    private static byte[] privKey;
+
     public static void main(String[] args) {
-        byte[] privKey = SDG.createPrivateKey();
+        int len = 0;
+
+        try {
+            InputStream f = new FileInputStream("osdg_test_private_key.bin");
+
+            privKey = new byte[SDG.KEY_SIZE];
+            len = f.read(privKey);
+        } catch (IOException e) {
+            // Nothing to do
+        }
+
+        if (len != SDG.KEY_SIZE) {
+            privKey = SDG.createPrivateKey();
+
+            try {
+                OutputStream f = new FileOutputStream("osdg_test_private_key.bin");
+                f.write(privKey);
+            } catch (IOException e) {
+                System.out.println("Failed to write private key file: " + e);
+            }
+        }
+
         Connection grid = new Connection();
 
         grid.setPrivateKey(privKey);
