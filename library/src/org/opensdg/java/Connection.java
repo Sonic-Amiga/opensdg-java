@@ -58,11 +58,12 @@ public class Connection {
         @Override
         public void completed(Integer result, Connection conn) {
             try {
-                int ret = conn.onDataReceived(result);
+                ReadResult ret = conn.onDataReceived(result);
 
-                if (ret == -1) {
+                if (ret == ReadResult.EOF) {
                     conn.handleError(getEOFException());
                 }
+                // Continue receiving
                 conn.asyncReceive();
             } catch (IOException | InterruptedException | ExecutionException e) {
                 conn.handleError(e);
@@ -73,6 +74,12 @@ public class Connection {
         public void failed(Throwable exc, Connection conn) {
             conn.handleError(exc);
         }
+    }
+
+    enum ReadResult {
+        CONTINUE,
+        EOF,
+        DONE
     }
 
     private static EOFException getEOFException() {
@@ -144,6 +151,11 @@ public class Connection {
 
                 openSocket(randomized[i].host, randomized[i].port);
                 startTunnel();
+                // Grid is always serviced asynchronously. The job of this connection now
+                // is to ping the grid (otherwise it times out in approximate 90 seconds)
+                // and service forwarding requests from peers.
+                asyncReceive();
+
                 return;
             } catch (IOException e) {
                 logger.debug("Failed to connect to {}:{}: {}", randomized[i].host, randomized[i].port, e.getMessage());
@@ -159,6 +171,7 @@ public class Connection {
     public void connectToRemote(Connection grid, byte[] peerId, String protocol)
             throws IOException, InterruptedException, ExecutionException {
         GridDataHandler gridHandler = (GridDataHandler) grid.dataHandler;
+        // First ask our grid to make tunnel for us
         PeerReply reply = gridHandler.connectToPeer(peerId, protocol).get();
 
         if (reply.getResult() != 0) {
@@ -179,12 +192,9 @@ public class Connection {
         dataHandler = new PeerDataHandler(this, protocol);
 
         openSocket(host.getHost(), host.getPort());
+        // We're now connected to one of grid servers, ask it to forward us to our peer
         sendPacket(new ForwardRequest(tunnelId));
-
-        int ret;
-        do {
-            ret = blockingReceive();
-        } while (ret == 0);
+        blockingReceive();
 
         startTunnel();
     }
@@ -196,18 +206,11 @@ public class Connection {
     }
 
     private void startTunnel() throws IOException, InterruptedException, ExecutionException {
+        // Initialize nonce counter
         nonce = 0;
-
+        // Start encrypted tunnel establishment by sending TELL packet
         sendPacket(new TELLPacket());
-
-        int ret;
-        do {
-            ret = blockingReceive();
-        } while (ret == 0);
-
-        if (ret == -1) {
-            throw getEOFException();
-        }
+        blockingReceive();
     }
 
     public void close() throws IOException {
@@ -247,16 +250,16 @@ public class Connection {
         }
     }
 
-    private int onDataReceived(int size) throws IOException, InterruptedException, ExecutionException {
+    private ReadResult onDataReceived(int size) throws IOException, InterruptedException, ExecutionException {
         if (size == -1) {
-            return -1;
+            return ReadResult.EOF;
         }
 
         bytesReceived += size;
         bytesLeft -= size;
 
         if (bytesLeft > 0) {
-            return 0;
+            return ReadResult.CONTINUE;
         }
 
         if (bytesReceived == 2) { // Received 2 bytes, length of the buffer
@@ -268,7 +271,7 @@ public class Connection {
             receiveBuffer = ByteBuffer.allocate(2 + bytesLeft);
             receiveBuffer.putShort(bytesLeft);
 
-            return 0;
+            return ReadResult.CONTINUE;
         }
 
         ByteBuffer buffer = receiveBuffer;
@@ -283,12 +286,12 @@ public class Connection {
                 // found in DanfossLink application by Christian Christiansen. Huge
                 // thanks for his reverse engineering effort!!!
                 logger.trace("Received packet: FORWARD_HOLD");
-                return 0;
+                return ReadResult.CONTINUE;
 
             case MSG_FORWARD_REPLY:
                 ForwardReply reply = new ForwardReply(buffer);
                 logger.trace("Received packet: {}", reply);
-                return 1;
+                return ReadResult.DONE;
 
             case MSG_FORWARD_ERROR:
                 ForwardError fwdErr = new ForwardError(buffer);
@@ -336,7 +339,7 @@ public class Connection {
             throw new ProtocolException("Unknown packet received: " + pkt.toString());
         }
 
-        return 0;
+        return ReadResult.CONTINUE;
     }
 
     private void getBuffer() {
@@ -349,14 +352,21 @@ public class Connection {
         }
     }
 
-    private int blockingReceive() throws IOException, InterruptedException, ExecutionException {
-        getBuffer();
-        int ret = s.read(receiveBuffer).get();
+    private void blockingReceive() throws IOException, InterruptedException, ExecutionException {
+        ReadResult ret;
 
-        return onDataReceived(ret);
+        do {
+            getBuffer();
+            int size = s.read(receiveBuffer).get();
+            ret = onDataReceived(size);
+        } while (ret == ReadResult.CONTINUE);
+
+        if (ret == ReadResult.EOF) {
+            throw getEOFException();
+        }
     }
 
-    void asyncReceive() {
+    public void asyncReceive() {
         getBuffer();
         s.read(receiveBuffer, this, readHandler);
     }

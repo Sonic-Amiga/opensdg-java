@@ -36,6 +36,9 @@ public class ConnectCommand extends CommandHandler {
 
         int num = Main.peers.add(conn);
         System.out.println("Created connection #" + num);
+
+        // Start asynchronous receiving on the Connection
+        conn.asyncReceive();
     }
 
 }

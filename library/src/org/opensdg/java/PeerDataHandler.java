@@ -3,6 +3,7 @@ package org.opensdg.java;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 
+import org.opensdg.java.Connection.ReadResult;
 import org.opensdg.protocol.Tunnel.MESGPacket;
 import org.opensdg.protocol.Tunnel.REDYPacket;
 
@@ -33,15 +34,17 @@ public class PeerDataHandler extends DataHandler {
     }
 
     @Override
-    int handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException {
-        // TODO Auto-generated method stub
-        return 0;
+    ReadResult handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException {
+        // REDY packet from a device contains its built-in license key
+        // in the same format as in VOCH packet, sent by us.
+        // Being an opensource project we simply don't care about it.
+        return ReadResult.DONE;
     }
 
     @Override
-    int handleMESG(MESGPacket pkt) throws IOException, InterruptedException, ExecutionException {
+    ReadResult handleMESG(MESGPacket pkt) throws IOException, InterruptedException, ExecutionException {
         // TODO Auto-generated method stub
-        return 0;
+        return ReadResult.CONTINUE;
     }
 
 }

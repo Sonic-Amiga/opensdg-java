@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 import javax.xml.bind.DatatypeConverter;
 
 import org.eclipse.jdt.annotation.NonNull;
+import org.opensdg.java.Connection.ReadResult;
 import org.opensdg.protocol.Control;
 import org.opensdg.protocol.Tunnel.MESGPacket;
 import org.opensdg.protocol.Tunnel.REDYPacket;
@@ -59,7 +60,7 @@ public class GridDataHandler extends DataHandler {
     }
 
     @Override
-    int handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException {
+    ReadResult handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException {
         // REDY payload from DEVISmart cloud is empty, nothing to do with it.
         logger.trace("REDY payload: {}", pkt.getPayload());
 
@@ -74,11 +75,11 @@ public class GridDataHandler extends DataHandler {
         protocolVer.setMinor(Control.PROTOCOL_VERSION_MINOR);
 
         sendMESG(Control.MSG_PROTOCOL_VERSION, protocolVer.build());
-        return 0;
+        return ReadResult.CONTINUE;
     }
 
     @Override
-    int handleMESG(MESGPacket pkt) throws IOException, InterruptedException, ExecutionException {
+    ReadResult handleMESG(MESGPacket pkt) throws IOException, InterruptedException, ExecutionException {
         InputStream data = pkt.getPayload();
         int msgType = data.read();
 
@@ -99,9 +100,10 @@ public class GridDataHandler extends DataHandler {
 
                 logger.debug("Using protocol version {}.{}", major, minor);
 
+                // Send the first PING immediately, again, this is the same thing
+                // as original mdglib does
                 ping();
-                connection.asyncReceive();
-                return 1; // This breaks the blocking read loop in connect()
+                return ReadResult.DONE;
 
             case Control.MSG_PONG:
                 Pong pong = Pong.parseFrom(data);
@@ -132,9 +134,11 @@ public class GridDataHandler extends DataHandler {
                     }
                 }
 
-                if (request == null) {
+                if (request != null) {
+                    request.reportDone(reply);
+                } else {
+                    // This is not really an error, perhaps some stale request
                     logger.debug("MSG_PEER_REPLY: ForwardRequest #{} not found", requestId);
-                    return 0;
                 }
 
                 request.reportDone(reply);
@@ -148,7 +152,7 @@ public class GridDataHandler extends DataHandler {
                 break;
         }
 
-        return 0;
+        return ReadResult.CONTINUE;
     }
 
     private void sendMESG(byte cmd, AbstractMessage msg) throws IOException, InterruptedException, ExecutionException {
@@ -186,6 +190,7 @@ public class GridDataHandler extends DataHandler {
         pingScheduler.shutdown();
     }
 
+    @Override
     ForwardRequest connectToPeer(byte[] peerId, String protocol) {
         ForwardRequest request;
 
