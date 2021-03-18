@@ -62,9 +62,10 @@ public class Connection {
 
                 if (ret == ReadResult.EOF) {
                     conn.handleError(getEOFException());
+                } else {
+                    // Continue receiving
+                    conn.asyncReceive();
                 }
-                // Continue receiving
-                conn.asyncReceive();
             } catch (IOException | InterruptedException | ExecutionException e) {
                 conn.handleError(e);
             }
@@ -127,6 +128,14 @@ public class Connection {
         connectToGrid(danfoss_servers);
     }
 
+    /**
+     * Connects to a Grid and makes this Connection object a control connection.
+     * There can be multiple servers for load-balancing purposes. The
+     * array will be sorted in random order and connection is tried to
+     * all of them.
+     *
+     * @param servers array of endpoint specifiers.
+     */
     public void connectToGrid(@NonNull Endpoint[] servers)
             throws IOException, InterruptedException, ExecutionException {
         Endpoint[] list = servers.clone();
@@ -168,6 +177,13 @@ public class Connection {
         }
     }
 
+    /**
+     * Connects to a remote peer
+     *
+     * @param grid control connection to use
+     * @param peerId ID (AKA public key) of the peer to call
+     * @param protocol application-specific protocol ID
+     */
     public void connectToRemote(Connection grid, byte[] peerId, String protocol)
             throws IOException, InterruptedException, ExecutionException {
         GridDataHandler gridHandler = (GridDataHandler) grid.dataHandler;
@@ -213,6 +229,11 @@ public class Connection {
         blockingReceive();
     }
 
+    /**
+     * Close the connection
+     * After closing the Connection object can be reused
+     *
+     */
     public void close() throws IOException {
         DataHandler handler = dataHandler;
         dataHandler = null;
@@ -366,6 +387,10 @@ public class Connection {
         }
     }
 
+    /**
+     * Start asynchronous data reading
+     *
+     */
     public void asyncReceive() {
         getBuffer();
         s.read(receiveBuffer, this, readHandler);
@@ -389,6 +414,11 @@ public class Connection {
         }
     }
 
+    /**
+     * Called when an error happens during asynchronous reading
+     *
+     * @param exc an error description
+     */
     protected void onError(Throwable exc) {
         // It's strongly adviced to handle these events, so let's log under error
         // if the developer forgot to do so.
