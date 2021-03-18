@@ -6,9 +6,12 @@ import javax.xml.bind.DatatypeConverter;
 
 import org.opensdg.java.Connection;
 
+/**
+ * This class assigns numbers to connections for user's convenience
+ */
 public class PeerRegistry {
 
-    private ArrayList<Connection> list;
+    private ArrayList<Connection> list = new ArrayList<Connection>();
 
     public int add(Connection conn) {
         for (int i = 0; i < list.size(); i++) {

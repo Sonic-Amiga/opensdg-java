@@ -92,7 +92,7 @@ public class Main {
 
             String[] command = line.split(" ");
 
-            if (command.length > 0) {
+            if (command.length > 0 && !command[0].isEmpty()) {
                 CommandHandler handler = cmdMap.get(command[0]);
 
                 if (handler != null) {

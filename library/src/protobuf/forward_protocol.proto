@@ -1,0 +1,25 @@
+syntax = "proto2";
+
+package org.opensdg.protocol.generated;
+
+// MSG_FORWARD_REQUEST
+message ForwardRequest
+{
+  required fixed32 magic         = 1; // FORWARD_REMOTE_MAGIC
+  required uint32  protocolMajor = 2; // Protocol version
+  required uint32  protocolMinor = 3;
+  required bytes   tunnelId      = 4; // Tunnel ID from MSG_REMOTE_REPLY
+  required string  signature     = 5; // "Mdg-NaCl/binary"
+}
+
+// MSG_FORWARD_REPLY
+message ForwardReply
+{
+  required string signature = 1;
+}
+
+// MSG_FORWARD_ERROR
+message ForwardError
+{
+  required uint32 code = 1;
+}
