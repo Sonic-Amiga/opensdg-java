@@ -2,11 +2,7 @@ package org.opensdg.protocol;
 
 public class Control {
     // Grid message types
-    public static final byte MSG_FORWARD_REMOTE = 0;
     public static final byte MSG_PROTOCOL_VERSION = 1;
-    public static final byte MSG_FORWARD_HOLD = 1;
-    public static final byte MSG_FORWARD_REPLY = 2;
-    public static final byte MSG_FORWARD_ERROR = 3;
     public static final byte MSG_PING = 4;
     public static final byte MSG_PONG = 5;
     public static final byte MSG_CALL_REMOTE = 10;

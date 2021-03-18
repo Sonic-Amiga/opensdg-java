@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ProtocolException;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -11,9 +12,14 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import javax.xml.bind.DatatypeConverter;
+
+import org.eclipse.jdt.annotation.NonNull;
 import org.opensdg.protocol.Control;
 import org.opensdg.protocol.Tunnel.MESGPacket;
 import org.opensdg.protocol.Tunnel.REDYPacket;
+import org.opensdg.protocol.generated.ControlProtocol.ConnectToPeer;
+import org.opensdg.protocol.generated.ControlProtocol.PeerReply;
 import org.opensdg.protocol.generated.ControlProtocol.Ping;
 import org.opensdg.protocol.generated.ControlProtocol.Pong;
 import org.opensdg.protocol.generated.ControlProtocol.ProtocolVersion;
@@ -25,12 +31,14 @@ import com.google.protobuf.AbstractMessage;
 public class GridDataHandler extends DataHandler {
     private final Logger logger = LoggerFactory.getLogger(GridDataHandler.class);
 
-    int pingSequence = 0;
-    int pingDelay = -1;
-    long lastPing;
+    private int pingSequence = 0;
+    private int pingDelay = -1;
+    private long lastPing;
 
-    ScheduledExecutorService pingScheduler = Executors.newScheduledThreadPool(1);
-    ScheduledFuture<?> scheduledPing;
+    private ScheduledExecutorService pingScheduler = Executors.newScheduledThreadPool(1);
+    private ScheduledFuture<?> scheduledPing;
+
+    private @NonNull ArrayList<ForwardRequest> forwardQueue = new ArrayList<ForwardRequest>();
 
     private Runnable pingTask = new Runnable() {
         @Override
@@ -106,6 +114,32 @@ public class GridDataHandler extends DataHandler {
                 scheduledPing = pingScheduler.schedule(pingTask, connection.getPingInterval(), TimeUnit.SECONDS);
                 break;
 
+            case Control.MSG_REMOTE_REPLY:
+            case Control.MSG_PAIR_REMOTE_REPLY:
+                PeerReply reply = PeerReply.parseFrom(data);
+                int requestId = reply.getId();
+                ForwardRequest request = null;
+
+                synchronized (forwardQueue) {
+                    for (int i = 0; i < forwardQueue.size(); i++) {
+                        ForwardRequest r = forwardQueue.get(i);
+
+                        if (r.getId() == requestId) {
+                            forwardQueue.remove(i);
+                            request = r;
+                            break;
+                        }
+                    }
+                }
+
+                if (request == null) {
+                    logger.debug("MSG_PEER_REPLY: ForwardRequest #{} not found", requestId);
+                    return 0;
+                }
+
+                request.reportDone(reply);
+                break;
+
             case -1: // EOF while reading the payload, this really shouldn't happen
                 throw new ProtocolException("empty MESG received");
 
@@ -151,4 +185,42 @@ public class GridDataHandler extends DataHandler {
 
         pingScheduler.shutdown();
     }
+
+    ForwardRequest connectToPeer(byte[] peerId, String protocol) {
+        ForwardRequest request;
+
+        synchronized (forwardQueue) {
+            int n = forwardQueue.size();
+            int requestId;
+
+            if (n > 0) {
+                requestId = forwardQueue.get(n - 1).getId() + 1;
+            } else {
+                requestId = 0;
+            }
+            request = new ForwardRequest(requestId);
+            forwardQueue.add(request);
+        }
+
+        logger.debug("Created {}", request);
+
+        ConnectToPeer.Builder msg = ConnectToPeer.newBuilder();
+
+        msg.setId(request.getId());
+        // DatatypeConverter produces upper case, but the server wants only lower
+        msg.setPeerId(DatatypeConverter.printHexBinary(peerId).toLowerCase());
+        msg.setProtocol(protocol);
+
+        try {
+            sendMESG(Control.MSG_CALL_REMOTE, msg.build());
+        } catch (IOException | InterruptedException | ExecutionException e) {
+            synchronized (forwardQueue) {
+                forwardQueue.remove(request);
+            }
+            request.reportError(e);
+        }
+
+        return request;
+    }
+
 }

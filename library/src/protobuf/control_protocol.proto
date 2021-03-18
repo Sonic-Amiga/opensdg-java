@@ -2,16 +2,6 @@ syntax = "proto2";
 
 package org.opensdg.protocol.generated;
 
-// MSG_FORWARD_REMOTE
-message ForwardRemote
-{
-  required fixed32 magic         = 1; // FORWARD_REMOTE_MAGIC
-  required uint32  protocolMajor = 2; // Protocol version
-  required uint32  protocolMinor = 3;
-  required bytes   tunnelId      = 4; // Tunnel ID from MSG_REMOTE_REPLY
-  required string  signature     = 5; // "Mdg-NaCl/binary"
-}
-
 // MSG_PROTOCOL_VERSION
 message Property
 {
@@ -40,18 +30,6 @@ message Pong
   required uint32 seq = 1;
 }
 
-// MSG_FORWARD_REPLY
-message ForwardReply
-{
-  required string signature = 1;
-}
-
-// MSG_FORWARD_ERROR
-message ForwardError
-{
-  required uint32 code = 1;
-}
-
 // MSG_CALL_REMOTE
 message ConnectToPeer
 {
@@ -64,13 +42,13 @@ message ConnectToPeer
 message PeerInfo
 {
   required string peerId = 3;
-  message ForwardHost
+  message Endpoint
   {
     required string host = 1;
     required uint32 port = 2;
   }
-  required ForwardHost server   = 4;
-  required bytes       tunnelId = 5;
+  required Endpoint server   = 4;
+  required bytes    tunnelId = 5;
 }
 message PeerReply
 {

@@ -1,5 +1,6 @@
 package org.opensdg.java;
 
+import static org.opensdg.protocol.Forward.*;
 import static org.opensdg.protocol.Tunnel.*;
 
 import java.io.EOFException;
@@ -11,22 +12,30 @@ import java.nio.ByteOrder;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.channels.CompletionHandler;
+import java.rmi.RemoteException;
 import java.util.concurrent.ExecutionException;
 
 import javax.xml.bind.DatatypeConverter;
 
 import org.eclipse.jdt.annotation.NonNull;
+import org.opensdg.protocol.Forward;
+import org.opensdg.protocol.Forward.ForwardError;
+import org.opensdg.protocol.Forward.ForwardReply;
+import org.opensdg.protocol.Forward.ForwardRequest;
+import org.opensdg.protocol.Tunnel;
 import org.opensdg.protocol.Tunnel.COOKPacket;
 import org.opensdg.protocol.Tunnel.HELOPacket;
 import org.opensdg.protocol.Tunnel.MESGPacket;
-import org.opensdg.protocol.Tunnel.Packet;
 import org.opensdg.protocol.Tunnel.REDYPacket;
 import org.opensdg.protocol.Tunnel.TELLPacket;
 import org.opensdg.protocol.Tunnel.VOCHPacket;
 import org.opensdg.protocol.Tunnel.WELCPacket;
+import org.opensdg.protocol.generated.ControlProtocol.PeerInfo;
+import org.opensdg.protocol.generated.ControlProtocol.PeerReply;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.protobuf.ByteString;
 import com.neilalexander.jnacl.crypto.curve25519xsalsa20poly1305;
 
 public class Connection {
@@ -132,7 +141,9 @@ public class Connection {
 
         for (int i = 0; i < servers.length; i++) {
             try {
-                connect(randomized[i].host, randomized[i].port);
+
+                openSocket(randomized[i].host, randomized[i].port);
+                startTunnel();
                 return;
             } catch (IOException e) {
                 logger.debug("Failed to connect to {}:{}: {}", randomized[i].host, randomized[i].port, e.getMessage());
@@ -145,12 +156,46 @@ public class Connection {
         }
     }
 
-    protected void connect(String host, int port) throws IOException, InterruptedException, ExecutionException {
+    public void connectToRemote(Connection grid, byte[] peerId, String protocol)
+            throws IOException, InterruptedException, ExecutionException {
+        GridDataHandler gridHandler = (GridDataHandler) grid.dataHandler;
+        PeerReply reply = gridHandler.connectToPeer(peerId, protocol).get();
+
+        if (reply.getResult() != 0) {
+            // This may happen if e. g. there's no such peer ID on the Grid.
+            // It seems that error code would always be 1, but we report it just in case
+            throw new RemoteException("Connection refused by grid: " + reply.getResult());
+        }
+
+        PeerInfo info = reply.getPeer();
+        PeerInfo.Endpoint host = info.getServer();
+        ByteString tunnelId = info.getTunnelId();
+
+        logger.debug("ForwardRequest #{}: created tunnel {}", reply.getId(), new Hexdump(tunnelId.toByteArray()));
+
+        // Get ready to open own socket. Copy client keys from the grid connection.
+        clientPubkey = grid.clientPubkey;
+        clientPrivkey = grid.clientPrivkey;
+        dataHandler = new PeerDataHandler(this, protocol);
+
+        openSocket(host.getHost(), host.getPort());
+        sendPacket(new ForwardRequest(tunnelId));
+
+        int ret;
+        do {
+            ret = blockingReceive();
+        } while (ret == 0);
+
+        startTunnel();
+    }
+
+    private void openSocket(String host, int port) throws IOException, InterruptedException, ExecutionException {
         s = AsynchronousSocketChannel.open();
         s.connect(new InetSocketAddress(host, port)).get();
-
         logger.debug("Connected to {}:{}", host, port);
+    }
 
+    private void startTunnel() throws IOException, InterruptedException, ExecutionException {
         nonce = 0;
 
         sendPacket(new TELLPacket());
@@ -181,13 +226,20 @@ public class Connection {
         }
     }
 
-    private void sendPacket(Packet pkt) throws IOException, InterruptedException, ExecutionException {
+    private void sendPacket(Tunnel.Packet pkt) throws IOException, InterruptedException, ExecutionException {
         logger.trace("Sending packet: {}", pkt);
-        ByteBuffer data = pkt.getData();
+        sendData(pkt.getData());
+    }
+
+    private void sendPacket(Forward.Packet pkt) throws IOException, InterruptedException, ExecutionException {
+        logger.trace("Sending packet: {}", pkt);
+        sendData(pkt.getData());
+    }
+
+    private synchronized void sendData(ByteBuffer data) throws IOException, InterruptedException, ExecutionException {
+        int size = data.capacity();
 
         data.position(0);
-
-        int size = data.capacity();
 
         while (size > 0) {
             int ret = s.write(data).get();
@@ -219,12 +271,38 @@ public class Connection {
             return 0;
         }
 
-        Packet pkt = new Packet(receiveBuffer);
+        ByteBuffer buffer = receiveBuffer;
         receiveBuffer = null;
 
-        logger.trace("Received packet: {}", pkt);
+        // Forwarding protocol isn't encapsulated, handle it first
+        switch (buffer.get(2)) {
+            case MSG_FORWARD_HOLD:
+                // Sometimes before MSG_FORWARD_REPLY a three byte packet arrives,
+                // containing MSG_FORWARD_HOLD command. Ignore it. I don't know what this
+                // is for; the name comes from LUA source code for old version of mdglib
+                // found in DanfossLink application by Christian Christiansen. Huge
+                // thanks for his reverse engineering effort!!!
+                logger.trace("Received packet: FORWARD_HOLD");
+                return 0;
 
+            case MSG_FORWARD_REPLY:
+                ForwardReply reply = new ForwardReply(buffer);
+                logger.trace("Received packet: {}", reply);
+                return 1;
+
+            case MSG_FORWARD_ERROR:
+                ForwardError fwdErr = new ForwardError(buffer);
+                logger.trace("Received packet: {}", fwdErr);
+                throw new RemoteException("Connection refused by peer: " + fwdErr.getCode());
+
+            default:
+                break;
+        }
+
+        Tunnel.Packet pkt = new Tunnel.Packet(buffer);
         int cmd = pkt.getCommand();
+
+        logger.trace("Received packet: {}", pkt);
 
         if (cmd == CMD_WELC) {
             serverPubkey = new WELCPacket(pkt).getPeerID();
@@ -324,5 +402,15 @@ public class Connection {
      */
     public void setPingInterval(int seconds) {
         pingInterval = seconds;
+    }
+
+    /**
+     * Gets current peer ID for this connection. PeerID is also known as
+     * peer's public key.
+     *
+     * @return peer ID
+     */
+    public byte[] getPeerId() {
+        return serverPubkey;
     }
 }

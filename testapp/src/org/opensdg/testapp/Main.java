@@ -7,6 +7,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.util.HashSet;
+import java.util.concurrent.ExecutionException;
+
+import javax.xml.bind.DatatypeConverter;
 
 import org.opensdg.java.Connection;
 import org.opensdg.java.SDG;
@@ -19,6 +23,8 @@ public class Main {
     }
 
     private static byte[] privKey;
+    private static Connection grid;
+    private static HashSet<Connection> peers;
 
     public static void main(String[] args) {
         int len = 0;
@@ -28,23 +34,28 @@ public class Main {
 
             privKey = new byte[SDG.KEY_SIZE];
             len = f.read(privKey);
+            f.close();
+
+            System.out.println("Loaded private key: " + DatatypeConverter.printHexBinary(privKey));
         } catch (IOException e) {
             // Nothing to do
         }
 
         if (len != SDG.KEY_SIZE) {
             privKey = SDG.createPrivateKey();
+            System.out.println("Created new private key: " + DatatypeConverter.printHexBinary(privKey));
 
             try {
                 OutputStream f = new FileOutputStream("osdg_test_private_key.bin");
+
                 f.write(privKey);
+                f.close();
             } catch (IOException e) {
                 System.out.println("Failed to write private key file: " + e);
             }
         }
 
-        Connection grid = new Connection();
-
+        grid = new Connection();
         grid.setPrivateKey(privKey);
 
         try {
@@ -57,28 +68,39 @@ public class Main {
         System.out.println("Grid connection established");
 
         BufferedReader console = new BufferedReader(new InputStreamReader(System.in));
-        String cmd = "";
+        boolean quit = false;
 
         do {
+            String line;
+
             System.out.print('>');
+
             try {
-                cmd = console.readLine();
+                line = console.readLine();
             } catch (IOException e) {
                 printError("Error reading console", e);
                 break;
             }
 
-            switch (cmd) {
-                case "help":
-                    printHelp();
-                    break;
-                case "quit":
-                    break;
-                default:
-                    System.out.println("Unrecognized command: " + cmd);
-                    break;
+            String[] command = line.split(" ");
+
+            if (command.length > 0) {
+                switch (command[0]) {
+                    case "connect":
+                        connect(command);
+                        break;
+                    case "help":
+                        printHelp();
+                        break;
+                    case "quit":
+                        quit = true;
+                        break;
+                    default:
+                        System.out.println("Unrecognized command: " + line);
+                        break;
+                }
             }
-        } while (!cmd.equals("quit"));
+        } while (!quit);
 
         try {
             grid.close();
@@ -87,6 +109,28 @@ public class Main {
         }
 
         System.out.println("Bye!");
+    }
+
+    private static void connect(String[] command) {
+
+        if (command.length < 2) {
+            System.out.println("connect: peer is not specified");
+            return;
+        }
+
+        byte[] peerId = DatatypeConverter.parseHexBinary(command[1]);
+        String protocol = command.length > 2 ? command[2] : "dominion-1.0";
+
+        Connection conn = new Connection();
+
+        try {
+            conn.connectToRemote(grid, peerId, protocol);
+        } catch (IOException | InterruptedException | ExecutionException e) {
+            printError("connectToRemote() failed", e);
+            return;
+        }
+
+        peers.add(conn);
     }
 
     private static void printHelp() {
