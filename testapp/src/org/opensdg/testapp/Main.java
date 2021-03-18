@@ -7,8 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.util.HashSet;
-import java.util.concurrent.ExecutionException;
+import java.util.HashMap;
 
 import javax.xml.bind.DatatypeConverter;
 
@@ -23,10 +22,26 @@ public class Main {
     }
 
     private static byte[] privKey;
-    private static Connection grid;
-    private static HashSet<Connection> peers;
+
+    // In order to simplify the code these entities are global and avalible from within anywhere.
+    // It's definitely not the best Java coding ever, but this is just a crudely hacked up test app.
+    // Additionally having resources as static exposes various resource leaks, like unterminated
+    // executors. When this happens, the app freezes after "quit" command waiting for those threads.
+    public static Connection grid;
+    public static boolean exitFlag = false;
+    public static PeerRegistry peers = new PeerRegistry();
 
     public static void main(String[] args) {
+        HashMap<String, CommandHandler> cmdMap = new HashMap<String, CommandHandler>();
+
+        cmdMap.put("close", new CloseCommand());
+        cmdMap.put("connect", new ConnectCommand());
+        cmdMap.put("grid", new GridCommand());
+        cmdMap.put("help", new HelpCommand());
+        cmdMap.put("list", new ListCommand());
+        cmdMap.put("ping", new PingCommand());
+        cmdMap.put("quit", new QuitCommand());
+
         int len = 0;
 
         try {
@@ -57,20 +72,13 @@ public class Main {
 
         grid = new Connection();
         grid.setPrivateKey(privKey);
-
-        try {
-            grid.connectToDanfoss();
-        } catch (Exception e) {
-            printError("Failed to connect to grid", e);
-            return;
-        }
+        connectToGrid();
 
         System.out.println("Grid connection established");
 
         BufferedReader console = new BufferedReader(new InputStreamReader(System.in));
-        boolean quit = false;
 
-        do {
+        while (!exitFlag) {
             String line;
 
             System.out.print('>');
@@ -85,60 +93,45 @@ public class Main {
             String[] command = line.split(" ");
 
             if (command.length > 0) {
-                switch (command[0]) {
-                    case "connect":
-                        connect(command);
-                        break;
-                    case "help":
-                        printHelp();
-                        break;
-                    case "quit":
-                        quit = true;
-                        break;
-                    default:
-                        System.out.println("Unrecognized command: " + line);
-                        break;
+                CommandHandler handler = cmdMap.get(command[0]);
+
+                if (handler != null) {
+                    if (command.length - 1 < handler.numRequiredArgs()) {
+                        System.out.println(command[0] + ": required argument(s) missing");
+                    }
+                    handler.Execute(command);
+                } else {
+                    System.out.println("Unrecognized command: " + line);
                 }
             }
-        } while (!quit);
-
-        try {
-            grid.close();
-        } catch (IOException e) {
-            printError("Failed to close the connection", e);
         }
 
+        System.out.println("Closing grid connection...");
+        disconnectGrid();
         System.out.println("Bye!");
     }
 
-    private static void connect(String[] command) {
-
-        if (command.length < 2) {
-            System.out.println("connect: peer is not specified");
-            return;
-        }
-
-        byte[] peerId = DatatypeConverter.parseHexBinary(command[1]);
-        String protocol = command.length > 2 ? command[2] : "dominion-1.0";
-
-        Connection conn = new Connection();
-
+    public static void connectToGrid() {
         try {
-            conn.connectToRemote(grid, peerId, protocol);
-        } catch (IOException | InterruptedException | ExecutionException e) {
-            printError("connectToRemote() failed", e);
-            return;
+            grid.connectToDanfoss();
+        } catch (Exception e) {
+            printError("Failed to connect to grid", e);
         }
-
-        peers.add(conn);
     }
 
-    private static void printHelp() {
-        System.out.println("help - this help");
-        System.out.println("quit - quit program");
+    public static void disconnectGrid() {
+        closeConnection(grid);
     }
 
-    private static void printError(String header, Exception e) {
+    public static void closeConnection(Connection conn) {
+        try {
+            conn.close();
+        } catch (IOException e) {
+            printError("Failed to close the connection", e);
+        }
+    }
+
+    public static void printError(String header, Exception e) {
         System.err.print(header + " :");
         e.printStackTrace();
     }
