@@ -141,7 +141,6 @@ public class GridDataHandler extends DataHandler {
                     logger.debug("MSG_PEER_REPLY: ForwardRequest #{} not found", requestId);
                 }
 
-                request.reportDone(reply);
                 break;
 
             case -1: // EOF while reading the payload, this really shouldn't happen
