@@ -1,0 +1,5 @@
+.*
+*.bin
+*.jar
+generated
+target
