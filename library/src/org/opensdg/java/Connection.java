@@ -1,10 +1,10 @@
 package org.opensdg.java;
 
-import static org.opensdg.protocol.Forward.*;
 import static org.opensdg.protocol.Tunnel.*;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.ProtocolException;
 import java.nio.ByteBuffer;
@@ -18,9 +18,8 @@ import java.util.concurrent.ExecutionException;
 import javax.xml.bind.DatatypeConverter;
 
 import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.Nullable;
 import org.opensdg.protocol.Forward;
-import org.opensdg.protocol.Forward.ForwardError;
-import org.opensdg.protocol.Forward.ForwardReply;
 import org.opensdg.protocol.Forward.ForwardRequest;
 import org.opensdg.protocol.Tunnel;
 import org.opensdg.protocol.Tunnel.COOKPacket;
@@ -60,12 +59,23 @@ public class Connection {
             try {
                 ReadResult ret = conn.onDataReceived(result);
 
-                if (ret == ReadResult.EOF) {
-                    conn.handleError(getEOFException());
-                } else {
-                    // Continue receiving
-                    conn.asyncReceive();
+                switch (ret) {
+                    case EOF:
+                        conn.handleError(getEOFException());
+                        return;
+                    case DONE:
+                        InputStream data = conn.onPacketReceived();
+                        if (data != null) {
+                            // handleMESG() can't return EOF, so ignore
+                            conn.dataHandler.handleMESG(data);
+                        }
+                        break;
+                    case CONTINUE:
+                        break;
+
                 }
+                // Continue receiving
+                conn.asyncReceive();
             } catch (IOException | InterruptedException | ExecutionException e) {
                 conn.handleError(e);
             }
@@ -75,6 +85,12 @@ public class Connection {
         public void failed(Throwable exc, Connection conn) {
             conn.handleError(exc);
         }
+    }
+
+    public enum State {
+        CLOSED,
+        CONNECTING,
+        CONNECTED
     }
 
     enum ReadResult {
@@ -105,6 +121,8 @@ public class Connection {
     private DataHandler dataHandler;
 
     private int pingInterval = 30;
+
+    private State state = State.CLOSED;
 
     public void setPrivateKey(byte[] key) {
         clientPrivkey = key.clone();
@@ -153,11 +171,11 @@ public class Connection {
 
         IOException lastErr = null;
 
+        state = State.CONNECTING;
         dataHandler = new GridDataHandler(this);
 
         for (int i = 0; i < servers.length; i++) {
             try {
-
                 openSocket(randomized[i].host, randomized[i].port);
                 startTunnel();
                 // Grid is always serviced asynchronously. The job of this connection now
@@ -186,9 +204,9 @@ public class Connection {
      */
     public void connectToRemote(Connection grid, byte[] peerId, String protocol)
             throws IOException, InterruptedException, ExecutionException {
-        GridDataHandler gridHandler = (GridDataHandler) grid.dataHandler;
+        state = State.CONNECTING;
         // First ask our grid to make tunnel for us
-        PeerReply reply = gridHandler.connectToPeer(peerId, protocol).get();
+        PeerReply reply = grid.dataHandler.connectToPeer(peerId, protocol).get();
 
         if (reply.getResult() != 0) {
             // This may happen if e. g. there's no such peer ID on the Grid.
@@ -205,12 +223,24 @@ public class Connection {
         // Get ready to open own socket. Copy client keys from the grid connection.
         clientPubkey = grid.clientPubkey;
         clientPrivkey = grid.clientPrivkey;
-        dataHandler = new PeerDataHandler(this, protocol);
+
+        PeerDataHandler peerHandler = new PeerDataHandler(this, protocol);
+        dataHandler = peerHandler;
 
         openSocket(host.getHost(), host.getPort());
         // We're now connected to one of grid servers, ask it to forward us to our peer
         sendPacket(new ForwardRequest(tunnelId));
-        blockingReceive();
+
+        ReadResult ret;
+        do {
+            ret = blockingReceive();
+
+            if (ret == ReadResult.EOF) {
+                throw getEOFException();
+            }
+
+            ret = peerHandler.handleFwdPacket(detachBuffer());
+        } while (ret == ReadResult.CONTINUE);
 
         startTunnel();
     }
@@ -226,7 +256,19 @@ public class Connection {
         nonce = 0;
         // Start encrypted tunnel establishment by sending TELL packet
         sendPacket(new TELLPacket());
-        blockingReceive();
+
+        do {
+            InputStream msgData = receiveData();
+            if (msgData == null) {
+                throw getEOFException();
+            }
+
+            // Tunnel handshake also includes handling some MESG packets,
+            // and normally the handler would be called only for async read,
+            // so call it here explicitly. The handler will set our state to
+            // CONNECTED when done
+            dataHandler.handleMESG(msgData);
+        } while (state != State.CONNECTED);
     }
 
     /**
@@ -271,6 +313,27 @@ public class Connection {
         }
     }
 
+    /**
+     * Receive a single data packet synchronously
+     *
+     * @return data received or null on EOF
+     */
+    public @Nullable InputStream receiveData() throws IOException, InterruptedException, ExecutionException {
+        InputStream data;
+
+        do {
+            ReadResult ret = blockingReceive();
+
+            if (ret == ReadResult.EOF) {
+                return null;
+            }
+
+            data = onPacketReceived();
+        } while (data == null);
+
+        return data;
+    }
+
     private ReadResult onDataReceived(int size) throws IOException, InterruptedException, ExecutionException {
         if (size == -1) {
             return ReadResult.EOF;
@@ -295,35 +358,11 @@ public class Connection {
             return ReadResult.CONTINUE;
         }
 
-        ByteBuffer buffer = receiveBuffer;
-        receiveBuffer = null;
+        return ReadResult.DONE;
+    }
 
-        // Forwarding protocol isn't encapsulated, handle it first
-        switch (buffer.get(2)) {
-            case MSG_FORWARD_HOLD:
-                // Sometimes before MSG_FORWARD_REPLY a three byte packet arrives,
-                // containing MSG_FORWARD_HOLD command. Ignore it. I don't know what this
-                // is for; the name comes from LUA source code for old version of mdglib
-                // found in DanfossLink application by Christian Christiansen. Huge
-                // thanks for his reverse engineering effort!!!
-                logger.trace("Received packet: FORWARD_HOLD");
-                return ReadResult.CONTINUE;
-
-            case MSG_FORWARD_REPLY:
-                ForwardReply reply = new ForwardReply(buffer);
-                logger.trace("Received packet: {}", reply);
-                return ReadResult.DONE;
-
-            case MSG_FORWARD_ERROR:
-                ForwardError fwdErr = new ForwardError(buffer);
-                logger.trace("Received packet: {}", fwdErr);
-                throw new RemoteException("Connection refused by peer: " + fwdErr.getCode());
-
-            default:
-                break;
-        }
-
-        Tunnel.Packet pkt = new Tunnel.Packet(buffer);
+    private InputStream onPacketReceived() throws IOException, InterruptedException, ExecutionException {
+        Tunnel.Packet pkt = new Tunnel.Packet(detachBuffer());
         int cmd = pkt.getCommand();
 
         logger.trace("Received packet: {}", pkt);
@@ -353,14 +392,15 @@ public class Connection {
             sendPacket(new VOCHPacket(serverCookie, getNonce(), beforeNm, serverPubkey, clientPrivkey, clientPubkey,
                     tempPubkey, null));
         } else if (cmd == CMD_REDY) {
-            return dataHandler.handleREDY(new REDYPacket(pkt, beforeNm));
+            dataHandler.handleREDY(new REDYPacket(pkt, beforeNm));
+            return null;
         } else if (cmd == CMD_MESG) {
-            return dataHandler.handleMESG(new MESGPacket(pkt, beforeNm));
+            return new MESGPacket(pkt, beforeNm).getPayload();
         } else {
             throw new ProtocolException("Unknown packet received: " + pkt.toString());
         }
 
-        return ReadResult.CONTINUE;
+        return null;
     }
 
     private void getBuffer() {
@@ -373,7 +413,14 @@ public class Connection {
         }
     }
 
-    private void blockingReceive() throws IOException, InterruptedException, ExecutionException {
+    private ByteBuffer detachBuffer() {
+        ByteBuffer buffer = receiveBuffer;
+
+        receiveBuffer = null;
+        return buffer;
+    }
+
+    private ReadResult blockingReceive() throws IOException, InterruptedException, ExecutionException {
         ReadResult ret;
 
         do {
@@ -382,9 +429,7 @@ public class Connection {
             ret = onDataReceived(size);
         } while (ret == ReadResult.CONTINUE);
 
-        if (ret == ReadResult.EOF) {
-            throw getEOFException();
-        }
+        return ret;
     }
 
     /**
@@ -412,6 +457,19 @@ public class Connection {
         } else {
             onError(exc);
         }
+    }
+
+    void setState(State s) {
+        state = s;
+    }
+
+    /**
+     * Gets current state of this Connection
+     *
+     * @return {@link State} value
+     */
+    public State getState() {
+        return state;
     }
 
     /**

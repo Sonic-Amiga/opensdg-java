@@ -17,7 +17,6 @@ import javax.xml.bind.DatatypeConverter;
 import org.eclipse.jdt.annotation.NonNull;
 import org.opensdg.java.Connection.ReadResult;
 import org.opensdg.protocol.Control;
-import org.opensdg.protocol.Tunnel.MESGPacket;
 import org.opensdg.protocol.Tunnel.REDYPacket;
 import org.opensdg.protocol.generated.ControlProtocol.ConnectToPeer;
 import org.opensdg.protocol.generated.ControlProtocol.PeerReply;
@@ -79,8 +78,7 @@ public class GridDataHandler extends DataHandler {
     }
 
     @Override
-    ReadResult handleMESG(MESGPacket pkt) throws IOException, InterruptedException, ExecutionException {
-        InputStream data = pkt.getPayload();
+    ReadResult handleMESG(InputStream data) throws IOException, InterruptedException, ExecutionException {
         int msgType = data.read();
 
         switch (msgType) {
@@ -103,7 +101,8 @@ public class GridDataHandler extends DataHandler {
                 // Send the first PING immediately, again, this is the same thing
                 // as original mdglib does
                 ping();
-                return ReadResult.DONE;
+                connection.setState(Connection.State.CONNECTED);
+                break;
 
             case Control.MSG_PONG:
                 Pong pong = Pong.parseFrom(data);

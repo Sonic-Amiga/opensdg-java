@@ -1,10 +1,10 @@
 package org.opensdg.java;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.concurrent.ExecutionException;
 
 import org.opensdg.java.Connection.ReadResult;
-import org.opensdg.protocol.Tunnel.MESGPacket;
 import org.opensdg.protocol.Tunnel.REDYPacket;
 
 public abstract class DataHandler {
@@ -16,7 +16,7 @@ public abstract class DataHandler {
 
     abstract ReadResult handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException;
 
-    abstract ReadResult handleMESG(MESGPacket pkt) throws IOException, InterruptedException, ExecutionException;
+    abstract ReadResult handleMESG(InputStream pkt) throws IOException, InterruptedException, ExecutionException;
 
     ForwardRequest connectToPeer(byte[] peerId, String protocol) {
         throw new IllegalArgumentException("Connection is not a Grid");
