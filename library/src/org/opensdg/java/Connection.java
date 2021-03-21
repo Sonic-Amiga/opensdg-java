@@ -4,7 +4,6 @@ import static org.opensdg.protocol.Tunnel.*;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.ProtocolException;
 import java.nio.ByteBuffer;
@@ -12,15 +11,10 @@ import java.nio.ByteOrder;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.channels.CompletionHandler;
-import java.rmi.RemoteException;
 import java.util.concurrent.ExecutionException;
 
 import javax.xml.bind.DatatypeConverter;
 
-import org.eclipse.jdt.annotation.NonNull;
-import org.eclipse.jdt.annotation.Nullable;
-import org.opensdg.protocol.Forward;
-import org.opensdg.protocol.Forward.ForwardRequest;
 import org.opensdg.protocol.Tunnel;
 import org.opensdg.protocol.Tunnel.COOKPacket;
 import org.opensdg.protocol.Tunnel.HELOPacket;
@@ -29,18 +23,33 @@ import org.opensdg.protocol.Tunnel.REDYPacket;
 import org.opensdg.protocol.Tunnel.TELLPacket;
 import org.opensdg.protocol.Tunnel.VOCHPacket;
 import org.opensdg.protocol.Tunnel.WELCPacket;
-import org.opensdg.protocol.generated.ControlProtocol.PeerInfo;
-import org.opensdg.protocol.generated.ControlProtocol.PeerReply;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.protobuf.ByteString;
 import com.neilalexander.jnacl.crypto.curve25519xsalsa20poly1305;
 
-public class Connection {
+/**
+ * This class represents a single connection over the Grid.
+ *
+ * A Connection is an encrypted channel, using asymmetric encryption
+ * based on public and private keys. A public key is also known as a
+ * peer ID; it's used to identify the peer on a network.
+ *
+ * In order to establish a connection to a remote host over the Grid,
+ * you need a {@link PeerConnection} to perform the actual communication
+ * and a {@link GridConnection}, representing a particular Grid which the
+ * given peer is on.
+ *
+ * @author Pavel Fedin
+ */
+public abstract class Connection {
     private final Logger logger = LoggerFactory.getLogger(Connection.class);
 
-    private static class Hexdump {
+    /**
+     * An easy-to-use utility for printing hex dumps
+     *
+     */
+    protected static class Hexdump {
         byte[] data;
 
         public Hexdump(byte[] raw_key) {
@@ -64,10 +73,9 @@ public class Connection {
                         conn.handleError(getEOFException());
                         return;
                     case DONE:
-                        InputStream data = conn.onPacketReceived();
+                        MESGPacket data = conn.onPacketReceived();
                         if (data != null) {
-                            conn.dataHandler.handleMESG(data);
-                            conn.onDataReceived(data);
+                            conn.handleMESG(data);
                         }
                         break;
                     case CONTINUE:
@@ -99,9 +107,11 @@ public class Connection {
         DONE
     }
 
-    private static EOFException getEOFException() {
+    protected static EOFException getEOFException() {
         return new EOFException("Connection closed by peer");
     }
+
+    protected State state = State.CLOSED;
 
     private AsynchronousSocketChannel s;
 
@@ -109,8 +119,8 @@ public class Connection {
     private short bytesLeft;
     private int bytesReceived;
 
-    private byte[] clientPubkey;
-    private byte[] clientPrivkey;
+    protected byte[] clientPubkey;
+    protected byte[] clientPrivkey;
     private byte[] serverPubkey;
     private byte[] tempPubkey;
     private byte[] tempPrivkey;
@@ -118,134 +128,8 @@ public class Connection {
     private long nonce;
 
     private CompletionHandler<Integer, Connection> readHandler = new ReadHandler();
-    private DataHandler dataHandler;
 
-    private int pingInterval = 30;
-
-    private State state = State.CLOSED;
-
-    public void setPrivateKey(byte[] key) {
-        clientPrivkey = key.clone();
-        clientPubkey = SDG.calcPublicKey(clientPrivkey);
-    }
-
-    public static class Endpoint {
-        String host;
-        int port;
-
-        Endpoint(String h, int p) {
-            host = h;
-            port = p;
-        }
-    };
-
-    private static final Endpoint danfoss_servers[] = { new Endpoint("77.66.11.90", 443),
-            new Endpoint("77.66.11.92", 443), new Endpoint("5.179.92.180", 443), new Endpoint("5.179.92.182", 443) };
-
-    public void connectToDanfoss() throws IOException, InterruptedException, ExecutionException {
-        connectToGrid(danfoss_servers);
-    }
-
-    /**
-     * Connects to a Grid and makes this Connection object a control connection.
-     * There can be multiple servers for load-balancing purposes. The
-     * array will be sorted in random order and connection is tried to
-     * all of them.
-     *
-     * @param servers array of endpoint specifiers.
-     */
-    public void connectToGrid(@NonNull Endpoint[] servers)
-            throws IOException, InterruptedException, ExecutionException {
-        Endpoint[] list = servers.clone();
-        Endpoint[] randomized = new Endpoint[servers.length];
-
-        // Permute servers in random order in order to distribute the load
-        int left = servers.length;
-        for (int i = 0; i < servers.length; i++) {
-            int idx = (int) (Math.random() * left);
-
-            randomized[i] = list[idx];
-            left--;
-            list[idx] = list[left];
-        }
-
-        IOException lastErr = null;
-
-        state = State.CONNECTING;
-        dataHandler = new GridDataHandler(this);
-
-        for (int i = 0; i < servers.length; i++) {
-            try {
-                openSocket(randomized[i].host, randomized[i].port);
-                startTunnel();
-                // Grid is always serviced asynchronously. The job of this connection now
-                // is to ping the grid (otherwise it times out in approximate 90 seconds)
-                // and service forwarding requests from peers.
-                asyncReceive();
-
-                return;
-            } catch (IOException e) {
-                logger.debug("Failed to connect to {}:{}: {}", randomized[i].host, randomized[i].port, e.getMessage());
-                lastErr = e;
-            }
-        }
-
-        if (lastErr != null) {
-            throw lastErr;
-        }
-    }
-
-    /**
-     * Connects to a remote peer
-     *
-     * @param grid control connection to use
-     * @param peerId ID (AKA public key) of the peer to call
-     * @param protocol application-specific protocol ID
-     */
-    public void connectToRemote(Connection grid, byte[] peerId, String protocol)
-            throws IOException, InterruptedException, ExecutionException {
-        state = State.CONNECTING;
-        // First ask our grid to make tunnel for us
-        PeerReply reply = grid.dataHandler.connectToPeer(peerId, protocol).get();
-
-        if (reply.getResult() != 0) {
-            // This may happen if e. g. there's no such peer ID on the Grid.
-            // It seems that error code would always be 1, but we report it just in case
-            throw new RemoteException("Connection refused by grid: " + reply.getResult());
-        }
-
-        PeerInfo info = reply.getPeer();
-        PeerInfo.Endpoint host = info.getServer();
-        ByteString tunnelId = info.getTunnelId();
-
-        logger.debug("ForwardRequest #{}: created tunnel {}", reply.getId(), new Hexdump(tunnelId.toByteArray()));
-
-        // Get ready to open own socket. Copy client keys from the grid connection.
-        clientPubkey = grid.clientPubkey;
-        clientPrivkey = grid.clientPrivkey;
-
-        PeerDataHandler peerHandler = new PeerDataHandler(this, protocol);
-        dataHandler = peerHandler;
-
-        openSocket(host.getHost(), host.getPort());
-        // We're now connected to one of grid servers, ask it to forward us to our peer
-        sendPacket(new ForwardRequest(tunnelId));
-
-        ReadResult ret;
-        do {
-            ret = receiveRawPacket();
-
-            if (ret == ReadResult.EOF) {
-                throw getEOFException();
-            }
-
-            ret = peerHandler.handleFwdPacket(detachBuffer());
-        } while (ret == ReadResult.CONTINUE);
-
-        startTunnel();
-    }
-
-    private void openSocket(String host, int port) throws IOException, InterruptedException, ExecutionException {
+    protected void openSocket(String host, int port) throws IOException, InterruptedException, ExecutionException {
         s = AsynchronousSocketChannel.open();
         s.connect(new InetSocketAddress(host, port)).get();
         logger.debug("Connected to {}:{}", host, port);
@@ -255,7 +139,7 @@ public class Connection {
      * Establish encrypted tunnel on this Connection
      *
      */
-    private void startTunnel() throws IOException, InterruptedException, ExecutionException {
+    protected void startTunnel() throws IOException, InterruptedException, ExecutionException {
         // Initialize nonce counter
         nonce = 0;
         // Start encrypted tunnel establishment by sending TELL packet
@@ -272,9 +156,9 @@ public class Connection {
             // and normally the handler would be called only for async read,
             // so call it here explicitly. The handler will set our state to
             // CONNECTED when done
-            InputStream msgData = onPacketReceived();
+            MESGPacket msgData = onPacketReceived();
             if (msgData != null) {
-                dataHandler.handleMESG(msgData);
+                handleMESG(msgData);
             }
 
         } while (state != State.CONNECTED);
@@ -286,13 +170,6 @@ public class Connection {
      *
      */
     public void close() throws IOException {
-        DataHandler handler = dataHandler;
-        dataHandler = null;
-
-        if (handler != null) {
-            handler.handleClose();
-        }
-
         AsynchronousSocketChannel ch = s;
         s = null;
 
@@ -308,12 +185,7 @@ public class Connection {
         sendData(pkt.getData());
     }
 
-    private void sendPacket(Forward.Packet pkt) throws IOException, InterruptedException, ExecutionException {
-        logger.trace("Sending packet: {}", pkt);
-        sendData(pkt.getData());
-    }
-
-    private synchronized void sendData(ByteBuffer data) throws IOException, InterruptedException, ExecutionException {
+    protected synchronized void sendData(ByteBuffer data) throws IOException, InterruptedException, ExecutionException {
         int size = data.capacity();
 
         data.position(0);
@@ -322,27 +194,6 @@ public class Connection {
             int ret = s.write(data).get();
             size -= ret;
         }
-    }
-
-    /**
-     * Receive a single data packet synchronously
-     *
-     * @return data received or null on EOF
-     */
-    public @Nullable InputStream receiveData() throws IOException, InterruptedException, ExecutionException {
-        InputStream data;
-
-        do {
-            ReadResult ret = receiveRawPacket();
-
-            if (ret == ReadResult.EOF) {
-                return null;
-            }
-
-            data = onPacketReceived();
-        } while (data == null);
-
-        return data;
     }
 
     /**
@@ -364,7 +215,7 @@ public class Connection {
      * or EOF reached
      *
      */
-    private ReadResult receiveRawPacket() throws IOException, InterruptedException, ExecutionException {
+    protected ReadResult receiveRawPacket() throws IOException, InterruptedException, ExecutionException {
         ReadResult ret;
 
         do {
@@ -418,7 +269,7 @@ public class Connection {
      *
      * @return Data to be passed over to the client or null if there's no one
      */
-    private InputStream onPacketReceived() throws IOException, InterruptedException, ExecutionException {
+    protected MESGPacket onPacketReceived() throws IOException, InterruptedException, ExecutionException {
         Tunnel.Packet pkt = new Tunnel.Packet(detachBuffer());
         int cmd = pkt.getCommand();
 
@@ -449,16 +300,20 @@ public class Connection {
             sendPacket(new VOCHPacket(serverCookie, getNonce(), beforeNm, serverPubkey, clientPrivkey, clientPubkey,
                     tempPubkey, null));
         } else if (cmd == CMD_REDY) {
-            dataHandler.handleREDY(new REDYPacket(pkt, beforeNm));
+            handleREDY(new REDYPacket(pkt, beforeNm));
             return null;
         } else if (cmd == CMD_MESG) {
-            return new MESGPacket(pkt, beforeNm).getPayload();
+            return new MESGPacket(pkt, beforeNm);
         } else {
             throw new ProtocolException("Unknown packet received: " + pkt.toString());
         }
 
         return null;
     }
+
+    abstract void handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException;
+
+    abstract void handleMESG(MESGPacket pkt) throws IOException, InterruptedException, ExecutionException;
 
     private void getBuffer() {
         if (receiveBuffer == null) {
@@ -470,7 +325,7 @@ public class Connection {
         }
     }
 
-    private ByteBuffer detachBuffer() {
+    protected ByteBuffer detachBuffer() {
         ByteBuffer buffer = receiveBuffer;
 
         receiveBuffer = null;
@@ -509,42 +364,14 @@ public class Connection {
     }
 
     /**
-     * Called when a data packet has been read asynchronously
-     *
-     * @param data Data to be processed
-     */
-    protected void onDataReceived(InputStream data) {
-        // Nothing to do here by default
-    }
-
-    /**
      * Called when an error happens during asynchronous reading
      *
      * @param exc an error description
      */
     protected void onError(Throwable exc) {
-        // It's strongly adviced to handle these events, so let's log under error
+        // It's strongly advised to handle these events, so let's log under error
         // if the developer forgot to do so.
         logger.error("Unhandled async I/O error:", exc);
-    }
-
-    /**
-     * Gets current ping interval in seconds
-     *
-     * @return number of seconds
-     */
-    public int getPingInterval() {
-        return pingInterval;
-    }
-
-    /**
-     * Sets ping interval in seconds. The new interval will be applied
-     * after the next pending ping is sent.
-     *
-     * @param seconds new ping interval is seconds
-     */
-    public void setPingInterval(int seconds) {
-        pingInterval = seconds;
     }
 
     /**

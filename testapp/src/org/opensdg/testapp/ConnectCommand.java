@@ -5,7 +5,7 @@ import java.util.concurrent.ExecutionException;
 
 import javax.xml.bind.DatatypeConverter;
 
-import org.opensdg.java.Connection;
+import org.opensdg.java.PeerConnection;
 
 public class ConnectCommand extends CommandHandler {
 
@@ -25,7 +25,7 @@ public class ConnectCommand extends CommandHandler {
         byte[] peerId = DatatypeConverter.parseHexBinary(command[1]);
         String protocol = command.length > 2 ? command[2] : "dominion-1.0";
 
-        Connection conn = new Connection();
+        PeerConnection conn = new PeerConnection();
 
         try {
             conn.connectToRemote(Main.grid, peerId, protocol);

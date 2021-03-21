@@ -5,15 +5,16 @@ import java.util.ArrayList;
 import javax.xml.bind.DatatypeConverter;
 
 import org.opensdg.java.Connection;
+import org.opensdg.java.PeerConnection;
 
 /**
  * This class assigns numbers to connections for user's convenience
  */
 public class PeerRegistry {
 
-    private ArrayList<Connection> list = new ArrayList<Connection>();
+    private ArrayList<PeerConnection> list = new ArrayList<PeerConnection>();
 
-    public int add(Connection conn) {
+    public int add(PeerConnection conn) {
         for (int i = 0; i < list.size(); i++) {
             if (list.get(i) == null) {
                 list.set(i, conn);
@@ -25,7 +26,7 @@ public class PeerRegistry {
         return list.size() - 1;
     }
 
-    public Connection get(int i) {
+    public PeerConnection get(int i) {
         return i < list.size() ? list.get(i) : null;
     }
 

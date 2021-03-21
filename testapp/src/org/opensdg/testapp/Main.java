@@ -12,6 +12,7 @@ import java.util.HashMap;
 import javax.xml.bind.DatatypeConverter;
 
 import org.opensdg.java.Connection;
+import org.opensdg.java.GridConnection;
 import org.opensdg.java.SDG;
 
 public class Main {
@@ -27,7 +28,7 @@ public class Main {
     // It's definitely not the best Java coding ever, but this is just a crudely hacked up test app.
     // Additionally having resources as static exposes various resource leaks, like unterminated
     // executors. When this happens, the app freezes after "quit" command waiting for those threads.
-    public static Connection grid;
+    public static GridConnection grid;
     public static boolean exitFlag = false;
     public static PeerRegistry peers = new PeerRegistry();
 
@@ -70,8 +71,7 @@ public class Main {
             }
         }
 
-        grid = new Connection();
-        grid.setPrivateKey(privKey);
+        grid = new GridConnection(privKey);
         connectToGrid();
 
         System.out.println("Grid connection established");
@@ -113,7 +113,7 @@ public class Main {
 
     public static void connectToGrid() {
         try {
-            grid.connectToDanfoss();
+            grid.connect(GridConnection.Danfoss);
         } catch (Exception e) {
             printError("Failed to connect to grid", e);
         }

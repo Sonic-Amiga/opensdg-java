@@ -397,7 +397,12 @@ public class Tunnel {
         }
 
         public InputStream getPayload() {
-            return new ByteArrayInputStream(decrypted.array(), OUTER_PAD + INNER_PAD + 2, getPayloadLength());
+            return getPayload(0);
+        }
+
+        public InputStream getPayload(int offset) {
+            return new ByteArrayInputStream(decrypted.array(), OUTER_PAD + INNER_PAD + 2 + offset,
+                    getPayloadLength() - offset);
         }
     }
 }
