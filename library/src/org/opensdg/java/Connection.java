@@ -166,10 +166,16 @@ public abstract class Connection {
 
     /**
      * Close the connection
-     * After closing the Connection object can be reused
+     *
+     * For convenience it's allowed to call close() on an already closed
+     * connection, it will do nothing. A closed {@link Connection} object can be reused.
      *
      */
     public void close() throws IOException {
+        if (state == State.CLOSED) {
+            return;
+        }
+
         AsynchronousSocketChannel ch = s;
         s = null;
 
@@ -350,8 +356,11 @@ public abstract class Connection {
         }
     }
 
-    void setState(State s) {
-        state = s;
+    protected void checkState(State required) {
+        if (state != required) {
+            throw new IllegalStateException(
+                    "Bad Connection state " + state + " for the call; required state " + required);
+        }
     }
 
     /**
