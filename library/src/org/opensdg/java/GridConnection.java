@@ -17,6 +17,7 @@ import org.opensdg.protocol.Control;
 import org.opensdg.protocol.Tunnel.MESGPacket;
 import org.opensdg.protocol.Tunnel.REDYPacket;
 import org.opensdg.protocol.generated.ControlProtocol.ConnectToPeer;
+import org.opensdg.protocol.generated.ControlProtocol.PairRemote;
 import org.opensdg.protocol.generated.ControlProtocol.PeerReply;
 import org.opensdg.protocol.generated.ControlProtocol.Ping;
 import org.opensdg.protocol.generated.ControlProtocol.Pong;
@@ -258,6 +259,29 @@ public class GridConnection extends Connection {
     }
 
     ForwardRequest connectToPeer(String peerId, String protocol) {
+        ForwardRequest request = createFwdReq();
+        ConnectToPeer.Builder msg = ConnectToPeer.newBuilder();
+
+        msg.setId(request.getId());
+        msg.setPeerId(peerId);
+        msg.setProtocol(protocol);
+
+        sendFwdReq(request, Control.MSG_CALL_REMOTE, msg.build());
+        return request;
+    }
+
+    ForwardRequest pair(String otp) {
+        ForwardRequest request = createFwdReq();
+        PairRemote.Builder msg = PairRemote.newBuilder();
+
+        msg.setId(request.getId());
+        msg.setOtp(otp);
+
+        sendFwdReq(request, Control.MSG_PAIR_REMOTE, msg.build());
+        return request;
+    }
+
+    ForwardRequest createFwdReq() {
         ForwardRequest request;
 
         synchronized (forwardQueue) {
@@ -274,23 +298,18 @@ public class GridConnection extends Connection {
         }
 
         logger.debug("Created {}", request);
+        return request;
+    }
 
-        ConnectToPeer.Builder msg = ConnectToPeer.newBuilder();
-
-        msg.setId(request.getId());
-        msg.setPeerId(peerId);
-        msg.setProtocol(protocol);
-
+    void sendFwdReq(ForwardRequest request, byte cmd, AbstractMessage msg) {
         try {
-            sendMESG(Control.MSG_CALL_REMOTE, msg.build());
+            sendMESG(Control.MSG_PAIR_REMOTE, msg);
         } catch (IOException | InterruptedException | ExecutionException e) {
             synchronized (forwardQueue) {
                 forwardQueue.remove(request);
             }
             request.reportError(e);
         }
-
-        return request;
     }
 
     @Override

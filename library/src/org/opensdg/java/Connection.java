@@ -121,10 +121,10 @@ public abstract class Connection {
 
     protected byte[] clientPubkey;
     protected byte[] clientPrivkey;
-    private byte[] serverPubkey;
+    protected byte[] serverPubkey;
     private byte[] tempPubkey;
     private byte[] tempPrivkey;
-    private byte[] beforeNm;
+    protected byte[] beforeNm;
     private long nonce;
 
     private CompletionHandler<Integer, Connection> readHandler = new ReadHandler();

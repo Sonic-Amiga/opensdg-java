@@ -25,7 +25,7 @@ public class Forward {
     private static final String FORWARD_REMOTE_SIGNATURE = "Mdg-NaCl/binary";
 
     public static class Packet {
-        ByteBuffer data;
+        private ByteBuffer data;
 
         Packet(byte cmd, AbstractMessage msg) throws IOException {
             int msgSize = 1 + msg.getSerializedSize();

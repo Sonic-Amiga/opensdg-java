@@ -75,6 +75,10 @@ public class PeerConnection extends Connection {
         String peerStr = DatatypeConverter.printHexBinary(peerId).toLowerCase();
         PeerReply reply = grid.connectToPeer(peerStr, protocol).get();
 
+        startForwarding(reply);
+    }
+
+    protected void startForwarding(PeerReply reply) throws IOException, InterruptedException, ExecutionException {
         if (reply.getResult() != 0) {
             // This may happen if e. g. there's no such peer ID on the Grid.
             // It seems that error code would always be 1, but we report it just in case
