@@ -35,8 +35,8 @@ public class GridConnection extends Connection {
     private final Logger logger = LoggerFactory.getLogger(GridConnection.class);
 
     private int pingInterval = 30;
-    private int pingSequence = 0;
-    private int pingDelay = -1;
+    private int pingSequence;
+    private int pingDelay;
     private long lastPing;
 
     private ScheduledExecutorService pingScheduler = Executors.newScheduledThreadPool(1);
@@ -116,6 +116,8 @@ public class GridConnection extends Connection {
 
         checkState(State.CLOSED);
         state = State.CONNECTING;
+        pingSequence = 0;
+        pingDelay = -1;
 
         for (int i = 0; i < servers.length; i++) {
             try {
@@ -187,12 +189,13 @@ public class GridConnection extends Connection {
             case Control.MSG_PONG:
                 Pong pong = Pong.parseFrom(data);
 
+                // Ignore some old stray PINGs
                 if (pong.getSeq() == pingSequence - 1) {
                     pingDelay = (int) (Calendar.getInstance().getTimeInMillis() - lastPing);
                     logger.debug("PING roundtrip {} ms", pingDelay);
+                    scheduledPing = pingScheduler.schedule(pingTask, pingInterval, TimeUnit.SECONDS);
                 }
 
-                scheduledPing = pingScheduler.schedule(pingTask, pingInterval, TimeUnit.SECONDS);
                 break;
 
             case Control.MSG_REMOTE_REPLY:
