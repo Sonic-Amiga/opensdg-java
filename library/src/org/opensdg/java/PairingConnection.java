@@ -1,5 +1,6 @@
 package org.opensdg.java;
 
+import static org.opensdg.java.InternalUtils.SCALARMULT_BYTES;
 import static org.opensdg.protocol.Pairing.*;
 
 import java.io.IOException;
@@ -102,11 +103,9 @@ public class PairingConnection extends PeerConnection {
                 byte[] xor = new byte[32];
                 salsa20.crypto_stream_xor(xor, challenge.getY(), 32, challenge.getNonce(), 0, hash);
 
-                byte[] base = new byte[SCALARMULT_BYTES];
-                curve25519.crypto_scalarmult_base(base, beforeNm);
-
+                byte[] base = InternalUtils.crypto_scalarmult_base(beforeNm);
                 byte[] p1 = crypto_scalarmult(xor, base);
-                byte[] rnd = SDG.randomBytes(SCALARMULT_BYTES);
+                byte[] rnd = InternalUtils.randomBytes(SCALARMULT_BYTES);
                 byte[] responseX = crypto_scalarmult(rnd, p1);
 
                 byte[] p2 = crypto_scalarmult(rnd, challenge.getX());
@@ -116,6 +115,7 @@ public class PairingConnection extends PeerConnection {
                 sha512.update(challenge.getX());
                 sha512.digest(innerHash, 0, SHA512_LENGTH);
                 // responseY = sha512(sha512(challenge.X) + p2
+                // Note that it will be trimmed, only first 32 bytes are sent
                 byte[] responseY = sha512.digest(innerHash);
 
                 // pairingResult = sha512(sha512(response.X) + p2

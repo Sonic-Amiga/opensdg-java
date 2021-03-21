@@ -1,5 +1,7 @@
 package org.opensdg.protocol;
 
+import static org.opensdg.java.InternalUtils.SCALARMULT_BYTES;
+
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -9,7 +11,6 @@ public class Pairing {
     public static final byte MSG_PAIRING_RESULT = 5;
 
     public static final int NONCE_LENGTH = 32;
-    public static final int SCALARMULT_BYTES = 32;
 
     public static class ChallengePacket {
         private byte[] X = new byte[SCALARMULT_BYTES];

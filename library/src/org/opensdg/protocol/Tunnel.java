@@ -6,6 +6,7 @@ import java.net.ProtocolException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+import org.opensdg.java.InternalUtils;
 import org.opensdg.java.SDG;
 
 import com.neilalexander.jnacl.crypto.curve25519xsalsa20poly1305;
@@ -286,7 +287,7 @@ public class Tunnel {
             super(COOKIE_SIZE + SHORT_NONCE_SIZE, SDG.KEY_SIZE + LONG_NONCE_SIZE + INNER_BOX_SIZE + 1
                     + (certificate == null ? 0 : (CERTIFICATE_PREFIX_SIZE + certificate.length)), CMD_VOCH);
 
-            byte[] long_nonce = SDG.randomBytes(LONG_NONCE_SIZE);
+            byte[] long_nonce = InternalUtils.randomBytes(LONG_NONCE_SIZE);
             byte[] box_nonce = buildLongTermNonce("CurveCPV", long_nonce);
             byte[] innerMsg = new byte[OUTER_PAD + INNER_BOX_SIZE];
 
