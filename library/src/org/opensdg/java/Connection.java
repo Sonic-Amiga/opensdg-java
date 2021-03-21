@@ -194,7 +194,7 @@ public abstract class Connection {
     /**
      * Synchronously send a raw data buffer
      *
-     * Keeps writing synchronosly until the full packet has been written
+     * Keeps writing synchronously until the full packet has been written
      *
      */
     protected synchronized void sendRawData(ByteBuffer data)
