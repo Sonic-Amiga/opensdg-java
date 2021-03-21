@@ -15,7 +15,6 @@ import java.util.concurrent.TimeUnit;
 import javax.xml.bind.DatatypeConverter;
 
 import org.eclipse.jdt.annotation.NonNull;
-import org.opensdg.java.Connection.ReadResult;
 import org.opensdg.protocol.Control;
 import org.opensdg.protocol.Tunnel.REDYPacket;
 import org.opensdg.protocol.generated.ControlProtocol.ConnectToPeer;
@@ -59,7 +58,7 @@ public class GridDataHandler extends DataHandler {
     }
 
     @Override
-    ReadResult handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException {
+    void handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException {
         // REDY payload from DEVISmart cloud is empty, nothing to do with it.
         logger.trace("REDY payload: {}", pkt.getPayload());
 
@@ -74,11 +73,10 @@ public class GridDataHandler extends DataHandler {
         protocolVer.setMinor(Control.PROTOCOL_VERSION_MINOR);
 
         sendMESG(Control.MSG_PROTOCOL_VERSION, protocolVer.build());
-        return ReadResult.CONTINUE;
     }
 
     @Override
-    ReadResult handleMESG(InputStream data) throws IOException, InterruptedException, ExecutionException {
+    void handleMESG(InputStream data) throws IOException, InterruptedException, ExecutionException {
         int msgType = data.read();
 
         switch (msgType) {
@@ -149,8 +147,6 @@ public class GridDataHandler extends DataHandler {
                 logger.warn("Unhandled grid message type {}", msgType);
                 break;
         }
-
-        return ReadResult.CONTINUE;
     }
 
     private void sendMESG(byte cmd, AbstractMessage msg) throws IOException, InterruptedException, ExecutionException {

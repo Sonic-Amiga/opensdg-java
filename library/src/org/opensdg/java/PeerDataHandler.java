@@ -73,19 +73,17 @@ public class PeerDataHandler extends DataHandler {
     }
 
     @Override
-    ReadResult handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException {
+    void handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException {
         // REDY packet from a device contains its built-in license key
         // in the same format as in VOCH packet, sent by us.
         // Being an opensource project we simply don't care about it.
         connection.setState(Connection.State.CONNECTED);
-        return ReadResult.DONE;
     }
 
     @Override
-    ReadResult handleMESG(InputStream data) throws IOException, InterruptedException, ExecutionException {
+    void handleMESG(InputStream data) throws IOException, InterruptedException, ExecutionException {
         // TODO Auto-generated method stub
         logger.info("Async read: {} bytes", data.available());
-        return ReadResult.CONTINUE;
     }
 
 }

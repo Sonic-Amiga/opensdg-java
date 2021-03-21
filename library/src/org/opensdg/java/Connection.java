@@ -57,7 +57,7 @@ public class Connection {
         @Override
         public void completed(Integer result, Connection conn) {
             try {
-                ReadResult ret = conn.onDataReceived(result);
+                ReadResult ret = conn.onRawDataReceived(result);
 
                 switch (ret) {
                     case EOF:
@@ -66,8 +66,8 @@ public class Connection {
                     case DONE:
                         InputStream data = conn.onPacketReceived();
                         if (data != null) {
-                            // handleMESG() can't return EOF, so ignore
                             conn.dataHandler.handleMESG(data);
+                            conn.onDataReceived(data);
                         }
                         break;
                     case CONTINUE:
@@ -233,7 +233,7 @@ public class Connection {
 
         ReadResult ret;
         do {
-            ret = blockingReceive();
+            ret = receiveRawPacket();
 
             if (ret == ReadResult.EOF) {
                 throw getEOFException();
@@ -251,6 +251,10 @@ public class Connection {
         logger.debug("Connected to {}:{}", host, port);
     }
 
+    /**
+     * Establish encrypted tunnel on this Connection
+     *
+     */
     private void startTunnel() throws IOException, InterruptedException, ExecutionException {
         // Initialize nonce counter
         nonce = 0;
@@ -258,8 +262,9 @@ public class Connection {
         sendPacket(new TELLPacket());
 
         do {
-            InputStream msgData = receiveData();
-            if (msgData == null) {
+            ReadResult ret = receiveRawPacket();
+
+            if (ret == ReadResult.EOF) {
                 throw getEOFException();
             }
 
@@ -267,7 +272,11 @@ public class Connection {
             // and normally the handler would be called only for async read,
             // so call it here explicitly. The handler will set our state to
             // CONNECTED when done
-            dataHandler.handleMESG(msgData);
+            InputStream msgData = onPacketReceived();
+            if (msgData != null) {
+                dataHandler.handleMESG(msgData);
+            }
+
         } while (state != State.CONNECTED);
     }
 
@@ -290,6 +299,8 @@ public class Connection {
         if (ch != null) {
             ch.close();
         }
+
+        state = State.CLOSED;
     }
 
     private void sendPacket(Tunnel.Packet pkt) throws IOException, InterruptedException, ExecutionException {
@@ -322,7 +333,7 @@ public class Connection {
         InputStream data;
 
         do {
-            ReadResult ret = blockingReceive();
+            ReadResult ret = receiveRawPacket();
 
             if (ret == ReadResult.EOF) {
                 return null;
@@ -334,7 +345,45 @@ public class Connection {
         return data;
     }
 
-    private ReadResult onDataReceived(int size) throws IOException, InterruptedException, ExecutionException {
+    /**
+     * Start asynchronous data receiving
+     *
+     * Initiates asynchronous data handling on the Connection.
+     * {@link onDataReceived} or {@link onError} will be called accordingly
+     *
+     */
+    public void asyncReceive() {
+        getBuffer();
+        s.read(receiveBuffer, this, readHandler);
+    }
+
+    /**
+     * Synchronously a raw packet into buffer
+     *
+     * Keeps reading synchronosly until the full packet has been read
+     * or EOF reached
+     *
+     */
+    private ReadResult receiveRawPacket() throws IOException, InterruptedException, ExecutionException {
+        ReadResult ret;
+
+        do {
+            getBuffer();
+            int size = s.read(receiveBuffer).get();
+            ret = onRawDataReceived(size);
+        } while (ret == ReadResult.CONTINUE);
+
+        return ret;
+    }
+
+    /**
+     * Handle receiving raw data
+     *
+     * Advances current read buffer pointer, performing reallocation when needed
+     *
+     * @param size Number of bytes received
+     */
+    private ReadResult onRawDataReceived(int size) throws IOException, InterruptedException, ExecutionException {
         if (size == -1) {
             return ReadResult.EOF;
         }
@@ -361,6 +410,14 @@ public class Connection {
         return ReadResult.DONE;
     }
 
+    /**
+     * Parse an incoming raw packet
+     *
+     * Inteprprets packet's contents and replies when needed.
+     * For MESG packet payload will be retrieved and returned.
+     *
+     * @return Data to be passed over to the client or null if there's no one
+     */
     private InputStream onPacketReceived() throws IOException, InterruptedException, ExecutionException {
         Tunnel.Packet pkt = new Tunnel.Packet(detachBuffer());
         int cmd = pkt.getCommand();
@@ -420,27 +477,6 @@ public class Connection {
         return buffer;
     }
 
-    private ReadResult blockingReceive() throws IOException, InterruptedException, ExecutionException {
-        ReadResult ret;
-
-        do {
-            getBuffer();
-            int size = s.read(receiveBuffer).get();
-            ret = onDataReceived(size);
-        } while (ret == ReadResult.CONTINUE);
-
-        return ret;
-    }
-
-    /**
-     * Start asynchronous data reading
-     *
-     */
-    public void asyncReceive() {
-        getBuffer();
-        s.read(receiveBuffer, this, readHandler);
-    }
-
     private long getNonce() {
         return nonce++;
     }
@@ -470,6 +506,15 @@ public class Connection {
      */
     public State getState() {
         return state;
+    }
+
+    /**
+     * Called when a data packet has been read asynchronously
+     *
+     * @param data Data to be processed
+     */
+    protected void onDataReceived(InputStream data) {
+        // Nothing to do here by default
     }
 
     /**
