@@ -188,10 +188,17 @@ public abstract class Connection {
 
     private void sendPacket(Tunnel.Packet pkt) throws IOException, InterruptedException, ExecutionException {
         logger.trace("Sending packet: {}", pkt);
-        sendData(pkt.getData());
+        sendRawData(pkt.getData());
     }
 
-    protected synchronized void sendData(ByteBuffer data) throws IOException, InterruptedException, ExecutionException {
+    /**
+     * Synchronously send a raw data buffer
+     *
+     * Keeps writing synchronosly until the full packet has been written
+     *
+     */
+    protected synchronized void sendRawData(ByteBuffer data)
+            throws IOException, InterruptedException, ExecutionException {
         int size = data.capacity();
 
         data.position(0);
@@ -342,7 +349,8 @@ public abstract class Connection {
         return nonce++;
     }
 
-    void sendMESG(byte[] data) throws ProtocolException, IOException, InterruptedException, ExecutionException {
+    protected void sendMESG(byte[] data)
+            throws ProtocolException, IOException, InterruptedException, ExecutionException {
         sendPacket(new MESGPacket(getNonce(), beforeNm, data));
     }
 

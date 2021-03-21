@@ -107,7 +107,7 @@ public class PeerConnection extends Connection {
 
     private void sendPacket(Forward.Packet pkt) throws IOException, InterruptedException, ExecutionException {
         logger.trace("Sending packet: {}", pkt);
-        sendData(pkt.getData());
+        sendRawData(pkt.getData());
     }
 
     @Override
@@ -195,5 +195,14 @@ public class PeerConnection extends Connection {
         } while (mesg == null);
 
         return getPayload(mesg);
+    }
+
+    /**
+     * Send a single data packet synchronously
+     *
+     * @param data data to send
+     */
+    public void sendData(byte[] data) throws ProtocolException, IOException, InterruptedException, ExecutionException {
+        sendMESG(data);
     }
 }
