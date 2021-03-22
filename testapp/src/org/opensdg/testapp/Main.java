@@ -40,6 +40,7 @@ public class Main {
         cmdMap.put("grid", new GridCommand());
         cmdMap.put("help", new HelpCommand());
         cmdMap.put("list", new ListCommand());
+        cmdMap.put("pair", new PairCommand());
         cmdMap.put("ping", new PingCommand());
         cmdMap.put("quit", new QuitCommand());
 
