@@ -34,11 +34,6 @@ public class Pairing {
         public byte[] getY() {
             return Y;
         }
-
-        @Override
-        public String toString() {
-            return "MSG_CHALLENGE";
-        }
     }
 
     public static class ResponsePacket {
@@ -67,7 +62,7 @@ public class Pairing {
             data.read(result);
         }
 
-        public byte[] gerResult() {
+        public byte[] getResult() {
             return result;
         }
     }

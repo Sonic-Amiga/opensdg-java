@@ -26,7 +26,6 @@ public class PairingConnection extends PeerConnection {
 
     private String otp;
     private byte[] pairingResult;
-    private boolean pairingDone;
 
     public void pairWithRemote(GridConnection grid, String otp)
             throws InterruptedException, ExecutionException, IOException, GeneralSecurityException {
@@ -36,7 +35,6 @@ public class PairingConnection extends PeerConnection {
         clientPubkey = grid.clientPubkey;
         clientPrivkey = grid.clientPrivkey;
 
-        pairingDone = false;
         // Filter the OTP, leaving only digits. The original library does the same.
         this.otp = otp.replaceAll("^0-9", "");
         // We never send the whole OTP to the Grid, i guess for security.
@@ -46,22 +44,30 @@ public class PairingConnection extends PeerConnection {
         PeerReply reply = grid.pair(otpServerPart).get();
         startForwarding(reply);
 
-        InputStream data;
+        ReadResult ret = ReadResult.CONTINUE;
+
         do {
-            data = receiveData();
+            InputStream data = receiveData();
+
             if (data != null) {
-                onPairingDataReceived(data);
+                ret = handlePairingPacket(data);
             }
-        } while (!pairingDone);
+        } while (ret != ReadResult.DONE);
     }
 
     @Override
     protected final void onDataReceived(InputStream data) {
         try {
-            onPairingDataReceived(data);
+            if (handlePairingPacket(data) == ReadResult.DONE) {
+                onPairingSuccess();
+            }
         } catch (IOException | GeneralSecurityException | InterruptedException | ExecutionException e) {
-            onError(e);
+            handleError(e);
         }
+    }
+
+    protected void onPairingSuccess() {
+        // TODO: Implement async pairing.
     }
 
     private static byte[] crypto_scalarmult(byte[] n, byte[] p) {
@@ -71,14 +77,14 @@ public class PairingConnection extends PeerConnection {
         return q;
     }
 
-    private void onPairingDataReceived(InputStream data)
+    private ReadResult handlePairingPacket(InputStream data)
             throws IOException, InterruptedException, ExecutionException, GeneralSecurityException {
         int cmd = data.read();
 
         switch (cmd) {
             case MSG_PAIRING_CHALLENGE:
                 ChallengePacket challenge = new ChallengePacket(data);
-                logger.trace("Received {}", challenge);
+                logger.trace("Received MSG_PAIRING_CHALLENGE");
                 logger.trace("X     {}", new Hexdump(challenge.getX()));
                 logger.trace("nonce {}", new Hexdump(challenge.getNonce()));
                 logger.trace("Y     {}", new Hexdump(challenge.getY()));
@@ -128,15 +134,21 @@ public class PairingConnection extends PeerConnection {
                 break;
 
             case MSG_PAIRING_RESULT:
-                ResultPacket result = new ResultPacket(data);
+                ResultPacket resultPkt = new ResultPacket(data);
+                byte[] result = resultPkt.getResult();
 
-                if (result.gerResult().equals(pairingResult)) {
-                    logger.debug("MSG_PAIRING_RESULT successful");
-                    pairingDone = true;
-                } else {
+                logger.trace("Received MSG_PAIRING_RESULT");
+                logger.trace("Result: {}", new Hexdump(result));
+
+                // Compare the result like the original library does, just in case
+                if (!result.equals(pairingResult)) {
                     throw new ProtocolException("Received incorrect pairing reply");
                 }
-                break;
+
+                logger.debug("MSG_PAIRING_RESULT successful");
+                return ReadResult.DONE;
         }
+
+        return ReadResult.CONTINUE;
     }
 }

@@ -354,7 +354,13 @@ public abstract class Connection {
         sendPacket(new MESGPacket(getNonce(), beforeNm, data));
     }
 
-    private void handleError(Throwable exc) {
+    /**
+     * This function is called if internal processing fails.
+     * E. g. failed to respond to a packet. It takes care about internal normal events,
+     * like asynchronous close.
+     *
+     */
+    protected void handleError(Throwable exc) {
         if (exc instanceof AsynchronousCloseException) {
             // This is not really an error, just someone has called close()
             // during pending read
