@@ -5,6 +5,7 @@ import static org.opensdg.protocol.Pairing.*;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.ProtocolException;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.util.concurrent.ExecutionException;
@@ -24,7 +25,7 @@ public class PairingConnection extends PeerConnection {
     private static final int SHA512_LENGTH = 64;
 
     private String otp;
-    private byte[] pairingResult;
+    private byte[] pairingResult = new byte[SCALARMULT_BYTES];
 
     public void pairWithRemote(GridConnection grid, String otp)
             throws InterruptedException, ExecutionException, IOException, GeneralSecurityException {
@@ -101,12 +102,12 @@ public class PairingConnection extends PeerConnection {
                 sha512.digest(innerHash, 0, SHA512_LENGTH);
 
                 // hash = sha512(innerHash + challenge.nonce)
-                System.arraycopy(challenge.getNonce(), 0, innerHash, SHA512_LENGTH, l);
+                System.arraycopy(challenge.getNonce(), 0, innerHash, SHA512_LENGTH, NONCE_LENGTH);
                 byte[] hash = sha512.digest(innerHash);
 
                 // The following is a pure mathemagic i have completely zero understanding of. :(
-                byte[] xor = new byte[32];
-                salsa20.crypto_stream_xor(xor, challenge.getY(), 32, challenge.getNonce(), 0, hash);
+                byte[] xor = new byte[SCALARMULT_BYTES];
+                salsa20.crypto_stream_xor(xor, challenge.getY(), SCALARMULT_BYTES, challenge.getNonce(), 0, hash);
 
                 byte[] base = InternalUtils.crypto_scalarmult_base(beforeNm);
                 byte[] p1 = crypto_scalarmult(xor, base);
@@ -126,7 +127,9 @@ public class PairingConnection extends PeerConnection {
                 // pairingResult = sha512(sha512(response.X) + p2
                 sha512.update(responseX);
                 sha512.digest(innerHash, 0, SHA512_LENGTH);
-                pairingResult = sha512.digest(innerHash);
+                byte[] expected = sha512.digest(innerHash);
+                // ... but use only first 32 bytes
+                System.arraycopy(expected, 0, pairingResult, 0, SCALARMULT_BYTES);
                 logger.trace("Expected result: {}", new Hexdump(pairingResult));
 
                 ResponsePacket response = new ResponsePacket(responseX, responseY);
@@ -142,8 +145,7 @@ public class PairingConnection extends PeerConnection {
 
                 // Compare the result like the original library does, just in case
                 if (!result.equals(pairingResult)) {
-                    // FIXME: Find the bug
-                    // throw new ProtocolException("Received incorrect pairing reply");
+                    throw new ProtocolException("Received incorrect pairing reply");
                 }
 
                 logger.debug("MSG_PAIRING_RESULT successful");
