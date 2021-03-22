@@ -15,6 +15,8 @@ import java.util.concurrent.ExecutionException;
 
 import javax.xml.bind.DatatypeConverter;
 
+import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.Nullable;
 import org.opensdg.protocol.Tunnel;
 import org.opensdg.protocol.Tunnel.COOKPacket;
 import org.opensdg.protocol.Tunnel.HELOPacket;
@@ -382,7 +384,7 @@ public abstract class Connection {
      *
      * @return {@link State} value
      */
-    public State getState() {
+    public @NonNull State getState() {
         return state;
     }
 
@@ -391,7 +393,7 @@ public abstract class Connection {
      *
      * @param exc an error description
      */
-    protected void onError(Throwable exc) {
+    protected void onError(@NonNull Throwable exc) {
         // It's strongly advised to handle these events, so let's log under error
         // if the developer forgot to do so.
         logger.error("Unhandled async I/O error:", exc);
@@ -403,7 +405,20 @@ public abstract class Connection {
      *
      * @return peer ID
      */
-    public byte[] getPeerId() {
+    public byte @Nullable [] getPeerId() {
         return serverPubkey;
+    }
+
+    /**
+     * Gets our own peer ID (AKA public key) for this connection.
+     *
+     * For {@link GridConnection} this peer ID is calculated from the private key.
+     * For other {@link Connection} types it is inherited from {@link GridConnection}
+     * that was used in order to establish it.
+     *
+     * @return peer ID
+     */
+    public byte @Nullable [] getMyPeerId() {
+        return clientPubkey;
     }
 }
