@@ -16,6 +16,12 @@
       <version>1.7.0</version>
       <scope>compile</scope>
     </dependency>
+        <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-simple</artifactId>
+        <version>1.7.0</version>
+        <scope>runtime</scope>
+    </dependency>
     <dependency>
 	  <groupId>eu.neilalexander</groupId>
 	  <artifactId>jnacl</artifactId>
@@ -43,9 +49,9 @@
             <configuration>
               <protocVersion>3.1.0</protocVersion>
               <inputDirectories>
-                <include>src/protobuf</include>
+                <include>src/main/protobuf</include>
               </inputDirectories>
-              <outputDirectory>src</outputDirectory>
+              <outputDirectory>src/main/java</outputDirectory>
             </configuration>
           </execution>
         </executions>

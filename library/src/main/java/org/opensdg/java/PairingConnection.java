@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.net.ProtocolException;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
+import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
 
 import org.opensdg.protocol.Pairing.ChallengePacket;
@@ -25,7 +26,7 @@ public class PairingConnection extends PeerConnection {
     private static final int SHA512_LENGTH = 64;
 
     private String otp;
-    private byte[] pairingResult = new byte[SCALARMULT_BYTES];
+    private byte[] expectedResult = new byte[SCALARMULT_BYTES];
 
     public void pairWithRemote(GridConnection grid, String otp)
             throws InterruptedException, ExecutionException, IOException, GeneralSecurityException {
@@ -129,8 +130,8 @@ public class PairingConnection extends PeerConnection {
                 sha512.digest(innerHash, 0, SHA512_LENGTH);
                 byte[] expected = sha512.digest(innerHash);
                 // ... but use only first 32 bytes
-                System.arraycopy(expected, 0, pairingResult, 0, SCALARMULT_BYTES);
-                logger.trace("Expected result: {}", new Hexdump(pairingResult));
+                System.arraycopy(expected, 0, expectedResult, 0, SCALARMULT_BYTES);
+                logger.trace("Expected result: {}", new Hexdump(expectedResult));
 
                 ResponsePacket response = new ResponsePacket(responseX, responseY);
                 sendData(response.getData());
@@ -144,7 +145,7 @@ public class PairingConnection extends PeerConnection {
                 logger.trace("Result: {}", new Hexdump(result));
 
                 // Compare the result like the original library does, just in case
-                if (!result.equals(pairingResult)) {
+                if (!Arrays.equals(expectedResult, result)) {
                     throw new ProtocolException("Received incorrect pairing reply");
                 }
 

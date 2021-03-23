@@ -13,14 +13,24 @@ public class Pairing {
     public static final int NONCE_LENGTH = 32;
 
     public static class ChallengePacket {
-        private byte[] X = new byte[SCALARMULT_BYTES];
-        private byte[] nonce = new byte[NONCE_LENGTH];
-        private byte[] Y = new byte[SCALARMULT_BYTES];
+        private byte[] X;
+        private byte[] nonce;
+        private byte[] Y;
 
         public ChallengePacket(InputStream data) throws IOException {
+            X = new byte[SCALARMULT_BYTES];
+            nonce = new byte[NONCE_LENGTH];
+            Y = new byte[SCALARMULT_BYTES];
+
             data.read(X);
             data.read(nonce);
             data.read(Y);
+        }
+
+        public ChallengePacket(byte[] x, byte[] n, byte[] y) {
+            X = x;
+            nonce = n;
+            Y = y;
         }
 
         public byte[] getX() {
@@ -34,6 +44,16 @@ public class Pairing {
         public byte[] getY() {
             return Y;
         }
+
+        public byte[] getData() {
+            byte[] data = new byte[1 + SCALARMULT_BYTES * 3];
+
+            data[0] = MSG_PAIRING_CHALLENGE;
+            System.arraycopy(X, 0, data, 1, SCALARMULT_BYTES);
+            System.arraycopy(nonce, 0, data, 1 + SCALARMULT_BYTES, SCALARMULT_BYTES);
+            System.arraycopy(Y, 0, data, 1 + SCALARMULT_BYTES * 2, SCALARMULT_BYTES);
+            return data;
+        }
     }
 
     public static class ResponsePacket {
@@ -45,6 +65,14 @@ public class Pairing {
             Y = y;
         }
 
+        public ResponsePacket(InputStream data) throws IOException {
+            X = new byte[SCALARMULT_BYTES];
+            Y = new byte[SCALARMULT_BYTES];
+
+            data.read(X);
+            data.read(Y);
+        }
+
         public byte[] getData() {
             byte[] data = new byte[1 + SCALARMULT_BYTES * 2];
 
@@ -53,13 +81,34 @@ public class Pairing {
             System.arraycopy(Y, 0, data, 1 + SCALARMULT_BYTES, SCALARMULT_BYTES);
             return data;
         }
+
+        public byte[] getX() {
+            return X;
+        }
+
+        public byte[] getY() {
+            return Y;
+        }
     }
 
     public static class ResultPacket {
-        private byte[] result = new byte[SCALARMULT_BYTES];
+        private byte[] result;
 
         public ResultPacket(InputStream data) throws IOException {
+            result = new byte[SCALARMULT_BYTES];
             data.read(result);
+        }
+
+        public ResultPacket(byte[] res) {
+            result = res;
+        }
+
+        public byte[] getData() {
+            byte[] data = new byte[1 + SCALARMULT_BYTES];
+
+            data[0] = MSG_PAIRING_RESULT;
+            System.arraycopy(result, 0, data, 1, SCALARMULT_BYTES);
+            return data;
         }
 
         public byte[] getResult() {
