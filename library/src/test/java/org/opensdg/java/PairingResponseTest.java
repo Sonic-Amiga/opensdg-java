@@ -46,7 +46,6 @@ class PairingResponseTest {
         packets.add(new ResultPacket(result).getData());
 
         MockGrid grid = new MockGrid(clientPrivkey);
-        ChallengePacket challenge = new ChallengePacket(X, nonce, Y);
         MockPairingConnection pairing = new MockPairingConnection(serverPubkey, beforenm, packets);
 
         try {
