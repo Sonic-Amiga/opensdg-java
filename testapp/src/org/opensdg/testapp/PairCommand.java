@@ -79,24 +79,28 @@ public class PairCommand extends CommandHandler {
             return;
         }
 
-        String config = new String();
         int dataSize = 0;
+        int offset = 0;
+        byte[] data = null;
 
         try {
             do {
                 DataInputStream chunk = new DataInputStream(peerConn.receiveData());
-                int size = chunk.available();
+                int chunkSize = chunk.available();
 
-                if (size > 8) {
+                if (chunkSize > 8) {
                     // In chunked mode the data will arrive in several packets.
                     // The first one will contain the header, specifying full data length.
                     // The header has integer 0 in the beginning so that it's easily distinguished
                     // from JSON plaintext
                     if (chunk.readInt() == 0) {
-                        dataSize = chunk.readInt();
+                        // Size is little-endian here
+                        dataSize = Integer.reverseBytes(chunk.readInt());
                         System.out.println("Chunked mode; full size = " + dataSize);
-                        size -= 8;
+                        data = new byte[dataSize];
+                        chunkSize -= 8; // We've consumed the header
                     } else {
+                        // No header, go back to the beginning
                         chunk.reset();
                     }
                 }
@@ -105,13 +109,14 @@ public class PairCommand extends CommandHandler {
                     // If the first packet didn't contain the header, this is not
                     // a chunked mode, so just use the complete length of this packet
                     // and we're done
-                    dataSize = size;
+                    dataSize = chunkSize;
                     System.out.println("Raw mode; full size = " + dataSize);
+                    data = new byte[dataSize];
                 }
 
-                config += chunk.readUTF();
-                dataSize -= size;
-            } while (dataSize > 0);
+                chunk.read(data, offset, chunkSize);
+                offset += chunkSize;
+            } while (offset < dataSize);
         } catch (Exception e) {
             Main.printError("Failed to receive config data", e);
             return;
@@ -122,6 +127,8 @@ public class PairCommand extends CommandHandler {
         } catch (Exception e) {
             Main.printError("Failed to close data connection", e);
         }
+
+        String config = new String(data);
 
         System.out.println("Received DeviReg Smart config data:");
         System.out.println(config);
