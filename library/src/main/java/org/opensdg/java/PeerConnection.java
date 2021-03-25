@@ -33,7 +33,7 @@ import com.google.protobuf.ByteString;
 public class PeerConnection extends Connection {
     private final Logger logger = LoggerFactory.getLogger(PeerConnection.class);
 
-    private int discardFirstBytes;
+    private int discardFirstBytes = 0;
 
     /**
      * Connects to a remote peer
@@ -44,11 +44,7 @@ public class PeerConnection extends Connection {
      */
     public void connectToRemote(GridConnection grid, byte[] peerId, String protocol)
             throws IOException, InterruptedException, ExecutionException {
-        checkState(State.CLOSED);
-        state = State.CONNECTING;
-        // Copy client keys from the grid connection.
-        clientPubkey = grid.clientPubkey;
-        clientPrivkey = grid.clientPrivkey;
+        init(grid);
 
         /*
          * DEVISmart thermostat has a quirk: very first packet is prefixed with
@@ -76,6 +72,14 @@ public class PeerConnection extends Connection {
         PeerReply reply = grid.connectToPeer(peerStr, protocol).get();
 
         startForwarding(reply);
+    }
+
+    protected void init(GridConnection grid) {
+        checkState(State.CLOSED);
+        state = State.CONNECTING;
+        // Copy client keys from the grid connection.
+        clientPubkey = grid.clientPubkey;
+        clientPrivkey = grid.clientPrivkey;
     }
 
     protected void startForwarding(PeerReply reply) throws IOException, InterruptedException, ExecutionException {

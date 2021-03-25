@@ -62,7 +62,7 @@ public class PairCommand extends CommandHandler {
         PeerConnection peerConn = new PeerConnection();
 
         try {
-            peerConn.connectToRemote(Main.grid, peerId, "dominion-config-1.0");
+            peerConn.connectToRemote(Main.grid, peerId, "dominion-configuration-1.0");
         } catch (Exception e) {
             Main.printError("Failed to establish data connection", e);
             return;

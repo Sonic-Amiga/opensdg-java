@@ -30,11 +30,7 @@ public class PairingConnection extends PeerConnection {
 
     public void pairWithRemote(GridConnection grid, String otp)
             throws InterruptedException, ExecutionException, IOException, GeneralSecurityException {
-        checkState(State.CLOSED);
-        state = State.CONNECTING;
-        // Copy client keys from the grid connection.
-        clientPubkey = grid.clientPubkey;
-        clientPrivkey = grid.clientPrivkey;
+        init(grid);
 
         // Filter the OTP, leaving only digits. The original library does the same.
         this.otp = otp.replaceAll("^0-9", "");

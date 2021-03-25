@@ -303,7 +303,7 @@ public class GridConnection extends Connection {
 
     void sendFwdReq(ForwardRequest request, byte cmd, AbstractMessage msg) {
         try {
-            sendMESG(Control.MSG_PAIR_REMOTE, msg);
+            sendMESG(cmd, msg);
         } catch (IOException | InterruptedException | ExecutionException e) {
             synchronized (forwardQueue) {
                 forwardQueue.remove(request);
