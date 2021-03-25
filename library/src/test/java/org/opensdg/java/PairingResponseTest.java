@@ -36,7 +36,7 @@ class PairingResponseTest {
     static final String otp = "1234567";
 
     static final byte[] result = DatatypeConverter
-            .parseHexBinary("93582D3E66A750B14724F7AF53ADDA4CC3A243BD1BBDB1C9E20E9A2F9E875FDD");
+            .parseHexBinary("b41058b5eb737cb6003d9d670752efbc97c571fe6bf44579798895c7bfc67af2");
 
     @Test
     void test() {

@@ -19,7 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.neilalexander.jnacl.crypto.curve25519;
-import com.neilalexander.jnacl.crypto.salsa20;
+import com.neilalexander.jnacl.crypto.xsalsa20;
 
 public class PairingConnection extends PeerConnection {
     private final Logger logger = LoggerFactory.getLogger(PairingConnection.class);
@@ -108,7 +108,7 @@ public class PairingConnection extends PeerConnection {
 
                 // The following is a pure mathemagic i have completely zero understanding of. :(
                 byte[] xor = new byte[SCALARMULT_BYTES];
-                salsa20.crypto_stream_xor(xor, challenge.getY(), SCALARMULT_BYTES, challenge.getNonce(), 0, hash);
+                xsalsa20.crypto_stream_xor(xor, challenge.getY(), SCALARMULT_BYTES, challenge.getNonce(), hash);
 
                 byte[] base = InternalUtils.crypto_scalarmult_base(beforeNm);
                 byte[] p1 = crypto_scalarmult(xor, base);
