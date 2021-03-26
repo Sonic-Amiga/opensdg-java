@@ -14,8 +14,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.opensdg.protocol.Control;
-import org.opensdg.protocol.Tunnel.MESGPacket;
-import org.opensdg.protocol.Tunnel.REDYPacket;
 import org.opensdg.protocol.generated.ControlProtocol.ConnectToPeer;
 import org.opensdg.protocol.generated.ControlProtocol.PairRemote;
 import org.opensdg.protocol.generated.ControlProtocol.PeerReply;
@@ -124,6 +122,19 @@ public class GridConnection extends Connection {
             try {
                 openSocket(randomized[i].host, randomized[i].port);
                 startTunnel();
+
+                // Tunnel handshake also includes handling some MESG packets,
+                // the handler will set our state to CONNECTED when done
+                while (state != State.CONNECTED) {
+                    ReadResult ret = receiveRawPacket();
+
+                    if (ret == ReadResult.EOF) {
+                        throw getEOFException();
+                    }
+
+                    onPacketReceived();
+                }
+
                 // Grid is always serviced asynchronously. The job of this connection now
                 // is to ping the grid (otherwise it times out in approximate 90 seconds)
                 // and service forwarding requests from peers.
@@ -142,10 +153,7 @@ public class GridConnection extends Connection {
     }
 
     @Override
-    void handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException {
-        // REDY payload from DEVISmart cloud is empty, nothing to do with it.
-        logger.trace("REDY payload: {}", pkt.getPayload());
-
+    protected void handleReadyPacket() throws IOException, InterruptedException, ExecutionException {
         // At this point the grid seems to be ready and subsequent steps are
         // probably optional. But let's do them just in case, to be as close
         // to original implementation as possible.
@@ -160,8 +168,7 @@ public class GridConnection extends Connection {
     }
 
     @Override
-    protected void handleMESG(MESGPacket pkt) throws IOException, InterruptedException, ExecutionException {
-        InputStream data = pkt.getPayload();
+    protected void handleDataPacket(InputStream data) throws IOException, InterruptedException, ExecutionException {
         int msgType = data.read();
 
         switch (msgType) {

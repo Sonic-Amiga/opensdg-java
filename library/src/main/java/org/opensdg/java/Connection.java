@@ -4,6 +4,7 @@ import static org.opensdg.protocol.Tunnel.*;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.ProtocolException;
 import java.nio.ByteBuffer;
@@ -75,10 +76,7 @@ public abstract class Connection {
                         conn.handleError(getEOFException());
                         return;
                     case DONE:
-                        MESGPacket data = conn.onPacketReceived();
-                        if (data != null) {
-                            conn.handleMESG(data);
-                        }
+                        conn.onPacketReceived();
                         break;
                     case CONTINUE:
                         break;
@@ -147,23 +145,17 @@ public abstract class Connection {
         // Start encrypted tunnel establishment by sending TELL packet
         sendPacket(new TELLPacket());
 
+        ReadResult ret;
+
         do {
-            ReadResult ret = receiveRawPacket();
+            ret = receiveRawPacket();
 
             if (ret == ReadResult.EOF) {
                 throw getEOFException();
             }
 
-            // Tunnel handshake also includes handling some MESG packets,
-            // and normally the handler would be called only for async read,
-            // so call it here explicitly. The handler will set our state to
-            // CONNECTED when done
-            MESGPacket msgData = onPacketReceived();
-            if (msgData != null) {
-                handleMESG(msgData);
-            }
-
-        } while (state != State.CONNECTED);
+            ret = onPacketReceived();
+        } while (ret != ReadResult.DONE);
     }
 
     /**
@@ -284,7 +276,7 @@ public abstract class Connection {
      *
      * @return Data to be passed over to the client or null if there's no one
      */
-    protected MESGPacket onPacketReceived() throws IOException, InterruptedException, ExecutionException {
+    protected ReadResult onPacketReceived() throws IOException, InterruptedException, ExecutionException {
         Tunnel.Packet pkt = new Tunnel.Packet(detachBuffer());
         int cmd = pkt.getCommand();
 
@@ -316,19 +308,32 @@ public abstract class Connection {
                     tempPubkey, null));
         } else if (cmd == CMD_REDY) {
             handleREDY(new REDYPacket(pkt, beforeNm));
-            return null;
+            return ReadResult.DONE;
         } else if (cmd == CMD_MESG) {
-            return new MESGPacket(pkt, beforeNm);
+            handleDataPacket(new MESGPacket(pkt, beforeNm).getPayload());
         } else {
             throw new ProtocolException("Unknown packet received: " + pkt.toString());
         }
 
-        return null;
+        return ReadResult.CONTINUE;
     }
 
-    abstract void handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException;
+    protected InputStream getPayload() throws ProtocolException {
+        return new MESGPacket(detachBuffer(), beforeNm).getPayload();
+    }
 
-    abstract void handleMESG(MESGPacket pkt) throws IOException, InterruptedException, ExecutionException;
+    protected void handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException {
+        // REDY packet from DEVISmart cloud is empty, nothing to do with it.
+        // REDY packet from a device contains its built-in license key
+        // in the same format as in VOCH packet, sent by us.
+        // Being an opensource project we simply don't care about it.
+        handleReadyPacket();
+    }
+
+    abstract protected void handleReadyPacket() throws IOException, InterruptedException, ExecutionException;
+
+    abstract protected void handleDataPacket(InputStream data)
+            throws IOException, InterruptedException, ExecutionException;
 
     private void getBuffer() {
         if (receiveBuffer == null) {

@@ -92,13 +92,24 @@ public class Tunnel {
             data.putInt(cmd);
         }
 
-        public Packet(ByteBuffer buffer) throws ProtocolException {
+        public Packet(ByteBuffer buffer, int data_size) throws ProtocolException {
             data = buffer.order(ByteOrder.BIG_ENDIAN);
-            if (data.capacity() < HEADER_SIZE) {
+            if (data.capacity() < HEADER_SIZE + data_size) {
                 throw new ProtocolException("Invalid packet received, too short");
             }
             if (getMagic() != MAGIC) {
                 throw new ProtocolException("Invalid packet received, bad magic");
+            }
+        }
+
+        public Packet(ByteBuffer buffer) throws ProtocolException {
+            this(buffer, 0);
+        }
+
+        public Packet(ByteBuffer buffer, int data_size, int cmd) throws ProtocolException {
+            this(buffer, data_size);
+            if (getCommand() != cmd) {
+                throw new ProtocolException("Unexpected packet received: " + toString());
             }
         }
 
@@ -153,6 +164,12 @@ public class Tunnel {
 
         EncryptedPacket(Packet pkt, int raw_portion_size, int encrypted_data_size) throws ProtocolException {
             super(pkt, raw_portion_size + INNER_PAD + encrypted_data_size);
+            allocateDecryptedBuffer(encrypted_data_size);
+        }
+
+        EncryptedPacket(ByteBuffer data, int raw_portion_size, int encrypted_data_size, int cmd)
+                throws ProtocolException {
+            super(data, raw_portion_size + INNER_PAD + encrypted_data_size, cmd);
             allocateDecryptedBuffer(encrypted_data_size);
         }
 
@@ -343,6 +360,15 @@ public class Tunnel {
             super(raw_portion_size, encrypted_data_size, cmd);
         }
 
+        protected DataPacket(ByteBuffer data, String noncePrefix, byte[] beforenm, int cmd) throws ProtocolException {
+            super(data, SHORT_NONCE_SIZE, data.capacity() - HEADER_SIZE - SHORT_NONCE_SIZE - INNER_PAD, cmd);
+
+            byte[] box_nonce = buildShortTermNonce(noncePrefix, getNonce());
+            byte[] msg = fillDataToDecrypt(SHORT_NONCE_SIZE);
+
+            decrypt(msg, msg, box_nonce, beforenm);
+        }
+
         protected DataPacket(Packet pkt, String noncePrefix, byte[] beforenm) throws ProtocolException {
             super(pkt, SHORT_NONCE_SIZE, pkt.getDataLength() - SHORT_NONCE_SIZE - INNER_PAD);
 
@@ -382,6 +408,10 @@ public class Tunnel {
             super(pkt, "CurveCP-server-M", beforenm);
         }
 
+        public MESGPacket(ByteBuffer data, byte[] beforenm) throws ProtocolException {
+            super(data, "CurveCP-server-M", beforenm, CMD_MESG);
+        }
+
         public MESGPacket(long nonce, byte[] beforenm, byte[] payload) throws ProtocolException {
             // Payload is prefixed by its length, yes, again
             super(SHORT_NONCE_SIZE, 2 + payload.length, CMD_MESG);
@@ -398,12 +428,7 @@ public class Tunnel {
         }
 
         public InputStream getPayload() {
-            return getPayload(0);
-        }
-
-        public InputStream getPayload(int offset) {
-            return new ByteArrayInputStream(decrypted.array(), OUTER_PAD + INNER_PAD + 2 + offset,
-                    getPayloadLength() - offset);
+            return new ByteArrayInputStream(decrypted.array(), OUTER_PAD + INNER_PAD + 2, getPayloadLength());
         }
     }
 }

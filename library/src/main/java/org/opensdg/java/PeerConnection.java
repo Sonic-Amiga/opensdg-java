@@ -17,7 +17,6 @@ import org.opensdg.protocol.Forward.ForwardError;
 import org.opensdg.protocol.Forward.ForwardReply;
 import org.opensdg.protocol.Forward.ForwardRequest;
 import org.opensdg.protocol.Tunnel.MESGPacket;
-import org.opensdg.protocol.Tunnel.REDYPacket;
 import org.opensdg.protocol.generated.ControlProtocol.PeerInfo;
 import org.opensdg.protocol.generated.ControlProtocol.PeerReply;
 import org.slf4j.Logger;
@@ -119,25 +118,28 @@ public class PeerConnection extends Connection {
     }
 
     @Override
-    void handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException {
-        // REDY packet from a device contains its built-in license key
-        // in the same format as in VOCH packet, sent by us.
-        // Being an opensource project we simply don't care about it.
+    protected void handleReadyPacket() throws IOException, InterruptedException, ExecutionException {
         state = State.CONNECTED;
     }
 
     @Override
-    protected void handleMESG(MESGPacket pkt) throws IOException, InterruptedException, ExecutionException {
+    protected void handleDataPacket(InputStream data) throws IOException, InterruptedException, ExecutionException {
         // Pass the data over to the client
-        onDataReceived(getPayload(pkt));
+        onDataReceived(handleProtocolBugs(data));
     }
 
     /**
      * A wrapper around {@link MESGPacket.getPayload} for handling discardFirstBytes
      *
+     * @throws IOException
+     *
      */
-    private InputStream getPayload(MESGPacket pkt) {
-        InputStream data = pkt.getPayload(discardFirstBytes);
+    private InputStream handleProtocolBugs(InputStream data) throws IOException {
+        // Discard how much we need to and remember the position for user's
+        // sake of convenience, so that calling reset() brings to the beginning
+        // of usable data
+        data.skip(discardFirstBytes);
+        data.mark(0);
 
         // Data is discarded only once
         discardFirstBytes = 0;
@@ -190,19 +192,13 @@ public class PeerConnection extends Connection {
      * @return data received or null on EOF
      */
     public @Nullable InputStream receiveData() throws IOException, InterruptedException, ExecutionException {
-        MESGPacket mesg;
+        ReadResult ret = receiveRawPacket();
 
-        do {
-            ReadResult ret = receiveRawPacket();
+        if (ret == ReadResult.EOF) {
+            return null;
+        }
 
-            if (ret == ReadResult.EOF) {
-                return null;
-            }
-
-            mesg = onPacketReceived();
-        } while (mesg == null);
-
-        return getPayload(mesg);
+        return handleProtocolBugs(getPayload());
     }
 
     /**
