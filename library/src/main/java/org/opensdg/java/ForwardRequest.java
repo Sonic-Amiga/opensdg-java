@@ -1,32 +1,28 @@
 package org.opensdg.java;
 
-import java.util.concurrent.Callable;
-import java.util.concurrent.FutureTask;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.opensdg.protocol.generated.ControlProtocol.PeerReply;
 
-class ForwardRequest extends FutureTask<PeerReply> {
-    private static class NoRun implements Callable<PeerReply> {
-        @Override
-        public PeerReply call() throws Exception {
-            throw new IllegalStateException("ForwardRequest must not be scheduled");
-        }
-
-    }
-
+class ForwardRequest implements Future<PeerReply> {
     private int requestId;
+    private PeerReply result = null;
+    private Throwable error = null;
 
     ForwardRequest(int id) {
-        super(new NoRun());
         requestId = id;
     }
 
-    void reportDone(PeerReply reply) {
-        set(reply);
+    synchronized void reportDone(PeerReply reply) {
+        result = reply;
+        notifyAll();
     }
 
-    void reportError(Throwable t) {
-        setException(t);
+    synchronized void reportError(Throwable t) {
+        error = t;
+        notifyAll();
     }
 
     int getId() {
@@ -36,5 +32,45 @@ class ForwardRequest extends FutureTask<PeerReply> {
     @Override
     public String toString() {
         return "ForwardRequest #" + requestId;
+    }
+
+    @Override
+    public boolean cancel(boolean mayInterruptIfRunning) {
+        // We don't support canceling (yet)
+        return false;
+    }
+
+    @Override
+    public boolean isCancelled() {
+        // We don't support canceling (yet)
+        return false;
+    }
+
+    @Override
+    public boolean isDone() {
+        return result != null || error != null;
+    }
+
+    @Override
+    public synchronized PeerReply get() throws InterruptedException, ExecutionException {
+        return get(0);
+    }
+
+    @Override
+    public PeerReply get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException {
+        return get(unit.convert(timeout, TimeUnit.MILLISECONDS));
+
+    }
+
+    private PeerReply get(long ms) throws InterruptedException, ExecutionException {
+        while (!isDone()) {
+            wait(ms);
+        }
+
+        if (error != null) {
+            throw new ExecutionException(error);
+        }
+
+        return result;
     }
 }
