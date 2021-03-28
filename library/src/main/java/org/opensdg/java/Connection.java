@@ -10,8 +10,6 @@ import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.channels.CompletionHandler;
 import java.util.concurrent.ExecutionException;
 
-import javax.xml.bind.DatatypeConverter;
-
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 import org.opensdg.protocol.EncryptedSocket;
@@ -34,23 +32,6 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class Connection {
     private final Logger logger = LoggerFactory.getLogger(Connection.class);
-
-    /**
-     * An easy-to-use utility for printing hex dumps
-     *
-     */
-    public static class Hexdump {
-        byte[] data;
-
-        public Hexdump(byte[] raw_key) {
-            data = raw_key;
-        }
-
-        @Override
-        public String toString() {
-            return DatatypeConverter.printHexBinary(data);
-        }
-    }
 
     private static class ReadHandler implements CompletionHandler<Integer, Connection> {
         @Override

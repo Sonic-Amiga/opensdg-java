@@ -11,6 +11,7 @@ import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
 
+import org.opensdg.java.InternalUtils.Hexdump;
 import org.opensdg.protocol.Pairing.ChallengePacket;
 import org.opensdg.protocol.Pairing.ResponsePacket;
 import org.opensdg.protocol.Pairing.ResultPacket;

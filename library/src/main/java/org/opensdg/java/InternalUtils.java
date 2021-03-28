@@ -2,6 +2,8 @@ package org.opensdg.java;
 
 import java.security.SecureRandom;
 
+import javax.xml.bind.DatatypeConverter;
+
 import com.neilalexander.jnacl.crypto.curve25519;
 
 /**
@@ -26,5 +28,22 @@ public class InternalUtils {
 
         curve25519.crypto_scalarmult_base(q, n);
         return q;
+    }
+
+    /**
+     * An easy-to-use utility for printing hex dumps
+     *
+     */
+    public static class Hexdump {
+        byte[] data;
+
+        public Hexdump(byte[] raw_key) {
+            data = raw_key;
+        }
+
+        @Override
+        public String toString() {
+            return DatatypeConverter.printHexBinary(data);
+        }
     }
 }

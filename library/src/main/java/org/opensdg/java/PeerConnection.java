@@ -9,6 +9,7 @@ import java.util.concurrent.ExecutionException;
 import javax.xml.bind.DatatypeConverter;
 
 import org.eclipse.jdt.annotation.Nullable;
+import org.opensdg.java.InternalUtils.Hexdump;
 import org.opensdg.protocol.Forward;
 import org.opensdg.protocol.generated.ControlProtocol.PeerInfo;
 import org.opensdg.protocol.generated.ControlProtocol.PeerReply;

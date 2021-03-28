@@ -9,9 +9,9 @@ import java.nio.ByteOrder;
 import java.util.concurrent.ExecutionException;
 
 import org.opensdg.java.Connection;
-import org.opensdg.java.Connection.Hexdump;
 import org.opensdg.java.Connection.ReadResult;
 import org.opensdg.java.InternalUtils;
+import org.opensdg.java.InternalUtils.Hexdump;
 import org.opensdg.java.SDG;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
