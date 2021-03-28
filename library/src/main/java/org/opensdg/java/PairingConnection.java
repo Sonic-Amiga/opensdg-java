@@ -10,6 +10,7 @@ import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 import org.opensdg.java.InternalUtils.Hexdump;
 import org.opensdg.protocol.Pairing.ChallengePacket;
@@ -30,7 +31,7 @@ public class PairingConnection extends PeerConnection {
     private byte[] expectedResult = new byte[SCALARMULT_BYTES];
 
     public void pairWithRemote(GridConnection grid, String otp)
-            throws InterruptedException, ExecutionException, IOException, GeneralSecurityException {
+            throws InterruptedException, ExecutionException, IOException, GeneralSecurityException, TimeoutException {
         init(grid);
 
         // Filter the OTP, leaving only digits. The original library does the same.
@@ -59,7 +60,8 @@ public class PairingConnection extends PeerConnection {
             if (handlePairingPacket(data) == ReadResult.DONE) {
                 onPairingSuccess();
             }
-        } catch (IOException | GeneralSecurityException | InterruptedException | ExecutionException e) {
+        } catch (IOException | GeneralSecurityException | InterruptedException | ExecutionException
+                | TimeoutException e) {
             handleError(e);
         }
     }
@@ -84,7 +86,7 @@ public class PairingConnection extends PeerConnection {
     // Pairing protocol is a challenge-response, designed to verify the OTP
     // (which both sides know) without actually sending it.
     private ReadResult handlePairingPacket(InputStream data)
-            throws IOException, InterruptedException, ExecutionException, GeneralSecurityException {
+            throws IOException, InterruptedException, ExecutionException, GeneralSecurityException, TimeoutException {
         int cmd = data.read();
 
         switch (cmd) {

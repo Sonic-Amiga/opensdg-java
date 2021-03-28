@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.opensdg.protocol.Control;
@@ -51,7 +52,7 @@ public class GridConnection extends Connection {
 
             try {
                 GridConnection.this.ping();
-            } catch (IOException | InterruptedException | ExecutionException e) {
+            } catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
                 GridConnection.this.handleError(e);
             }
         }
@@ -117,8 +118,10 @@ public class GridConnection extends Connection {
      * all of them.
      *
      * @param servers array of endpoint specifiers.
+     * @throws TimeoutException
      */
-    public void connect(@NonNull Endpoint[] servers) throws IOException, InterruptedException, ExecutionException {
+    public void connect(@NonNull Endpoint[] servers)
+            throws IOException, InterruptedException, ExecutionException, TimeoutException {
         Endpoint[] list = servers.clone();
         Endpoint[] randomized = new Endpoint[servers.length];
 
@@ -174,7 +177,7 @@ public class GridConnection extends Connection {
     }
 
     @Override
-    public void handleReadyPacket() throws IOException, InterruptedException, ExecutionException {
+    public void handleReadyPacket() throws IOException, InterruptedException, ExecutionException, TimeoutException {
         // At this point the grid seems to be ready and subsequent steps are
         // probably optional. But let's do them just in case, to be as close
         // to original implementation as possible.
@@ -189,7 +192,8 @@ public class GridConnection extends Connection {
     }
 
     @Override
-    public void handleDataPacket(InputStream data) throws IOException, InterruptedException, ExecutionException {
+    public void handleDataPacket(InputStream data)
+            throws IOException, InterruptedException, ExecutionException, TimeoutException {
         int msgType = data.read();
 
         switch (msgType) {
@@ -263,7 +267,7 @@ public class GridConnection extends Connection {
         }
     }
 
-    private void ping() throws IOException, InterruptedException, ExecutionException {
+    private void ping() throws IOException, InterruptedException, ExecutionException, TimeoutException {
         Ping.Builder ping = Ping.newBuilder();
 
         ping.setSeq(pingSequence++);
@@ -276,7 +280,8 @@ public class GridConnection extends Connection {
         sendMESG(Control.MSG_PING, ping.build());
     }
 
-    private void sendMESG(byte cmd, AbstractMessage msg) throws IOException, InterruptedException, ExecutionException {
+    private void sendMESG(byte cmd, AbstractMessage msg)
+            throws IOException, InterruptedException, ExecutionException, TimeoutException {
         ByteArrayOutputStream out = new ByteArrayOutputStream(1 + msg.getSerializedSize());
 
         // The protobuf contents is prefixed by a packet ID
@@ -332,7 +337,7 @@ public class GridConnection extends Connection {
     void sendFwdReq(ForwardRequest request, byte cmd, AbstractMessage msg) {
         try {
             sendMESG(cmd, msg);
-        } catch (IOException | InterruptedException | ExecutionException e) {
+        } catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
             synchronized (forwardQueue) {
                 forwardQueue.remove(request);
             }

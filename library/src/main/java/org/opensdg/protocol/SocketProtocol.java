@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 import org.opensdg.java.Connection;
 import org.opensdg.java.Connection.ReadResult;
@@ -32,8 +33,11 @@ public abstract class SocketProtocol {
      * Keeps reading synchronously until the full packet has been read
      * or EOF reached
      *
+     * @throws TimeoutException
+     *
      */
-    public ReadResult receiveRawPacket() throws IOException, InterruptedException, ExecutionException {
+    public ReadResult receiveRawPacket()
+            throws IOException, InterruptedException, ExecutionException, TimeoutException {
         ReadResult ret;
 
         do {
@@ -102,8 +106,10 @@ public abstract class SocketProtocol {
      * Synchronously establish this protocol
      *
      * Performs all the necessary handshake until it finishes
+     *
+     * @throws TimeoutException
      */
-    public ReadResult establish() throws IOException, InterruptedException, ExecutionException {
+    public ReadResult establish() throws IOException, InterruptedException, ExecutionException, TimeoutException {
 
         ReadResult ret;
 
@@ -118,7 +124,8 @@ public abstract class SocketProtocol {
         return ret;
     }
 
-    public ReadResult onPacketReceived() throws IOException, InterruptedException, ExecutionException {
+    public ReadResult onPacketReceived()
+            throws IOException, InterruptedException, ExecutionException, TimeoutException {
         return onPacketReceived(detachBuffer());
     }
 
@@ -129,7 +136,8 @@ public abstract class SocketProtocol {
      * For MESG packet payload will be retrieved and returned.
      *
      * @return Data to be passed over to the client or null if there's no one
+     * @throws TimeoutException
      */
     abstract protected ReadResult onPacketReceived(ByteBuffer data)
-            throws IOException, InterruptedException, ExecutionException;
+            throws IOException, InterruptedException, ExecutionException, TimeoutException;
 }

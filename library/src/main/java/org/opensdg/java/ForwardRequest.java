@@ -52,7 +52,7 @@ class ForwardRequest implements Future<PeerReply> {
     }
 
     @Override
-    public synchronized PeerReply get() throws InterruptedException, ExecutionException {
+    public PeerReply get() throws InterruptedException, ExecutionException {
         return get(0);
     }
 
@@ -62,7 +62,7 @@ class ForwardRequest implements Future<PeerReply> {
 
     }
 
-    private PeerReply get(long ms) throws InterruptedException, ExecutionException {
+    private synchronized PeerReply get(long ms) throws InterruptedException, ExecutionException {
         while (!isDone()) {
             wait(ms);
         }

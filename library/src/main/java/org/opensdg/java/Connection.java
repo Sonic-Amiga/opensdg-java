@@ -9,6 +9,8 @@ import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.channels.CompletionHandler;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
@@ -52,7 +54,7 @@ public abstract class Connection {
                 }
                 // Continue receiving
                 conn.asyncReceive();
-            } catch (IOException | InterruptedException | ExecutionException e) {
+            } catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
                 conn.handleError(e);
             }
         }
@@ -80,15 +82,17 @@ public abstract class Connection {
     }
 
     protected State state = State.CLOSED;
+    protected int timeout = 10;
 
     private AsynchronousSocketChannel s;
     protected EncryptedSocket tunnel;
 
     private CompletionHandler<Integer, Connection> readHandler = new ReadHandler();
 
-    protected void openSocket(String host, int port) throws IOException, InterruptedException, ExecutionException {
+    protected void openSocket(String host, int port)
+            throws IOException, InterruptedException, ExecutionException, TimeoutException {
         s = AsynchronousSocketChannel.open();
-        s.connect(new InetSocketAddress(host, port)).get();
+        s.connect(new InetSocketAddress(host, port)).get(timeout, TimeUnit.SECONDS);
         logger.debug("Connected to {}:{}", host, port);
     }
 
@@ -119,14 +123,17 @@ public abstract class Connection {
      *
      * Keeps writing synchronously until the full packet has been written
      *
+     * @throws TimeoutException
+     *
      */
-    public synchronized void sendRawData(ByteBuffer data) throws InterruptedException, ExecutionException {
+    public synchronized void sendRawData(ByteBuffer data)
+            throws InterruptedException, ExecutionException, TimeoutException {
         int size = data.capacity();
 
         data.position(0);
 
         while (size > 0) {
-            int ret = s.write(data).get();
+            int ret = s.write(data).get(timeout, TimeUnit.SECONDS);
             size -= ret;
         }
     }
@@ -147,9 +154,11 @@ public abstract class Connection {
      *
      * Internal function, do not use!
      *
+     * @throws TimeoutException
+     *
      */
-    public int syncReceive(ByteBuffer buffer) throws InterruptedException, ExecutionException {
-        return s.read(buffer).get();
+    public int syncReceive(ByteBuffer buffer) throws InterruptedException, ExecutionException, TimeoutException {
+        return s.read(buffer).get(timeout, TimeUnit.SECONDS);
     }
 
     /**
@@ -157,17 +166,22 @@ public abstract class Connection {
      *
      * Internal function, do not use!
      *
+     * @throws TimeoutException
+     *
      */
-    public abstract void handleReadyPacket() throws IOException, InterruptedException, ExecutionException;
+    public abstract void handleReadyPacket()
+            throws IOException, InterruptedException, ExecutionException, TimeoutException;
 
     /**
      * Handle incoming data packet
      *
      * Internal function, do not use!
      *
+     * @throws TimeoutException
+     *
      */
     public abstract void handleDataPacket(InputStream data)
-            throws IOException, InterruptedException, ExecutionException;
+            throws IOException, InterruptedException, ExecutionException, TimeoutException;
 
     /**
      * This function is called if internal processing fails.
@@ -233,5 +247,17 @@ public abstract class Connection {
      */
     public byte @Nullable [] getMyPeerId() {
         return tunnel.getMyPeerId();
+    }
+
+    /**
+     * Sets timeout for requests in second
+     *
+     * Sets timeout for various socket operations, like connecting, sending,
+     * receiving, etc; in seconds. Default value is 10.
+     *
+     * @return peer ID
+     */
+    public void setTimeout(int seconds) {
+        timeout = seconds;
     }
 }

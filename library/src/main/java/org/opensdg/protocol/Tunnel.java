@@ -7,6 +7,7 @@ import java.net.ProtocolException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 import org.opensdg.java.Connection;
 import org.opensdg.java.Connection.ReadResult;
@@ -472,7 +473,7 @@ public class Tunnel extends EncryptedSocket {
 
     @Override
     protected ReadResult onPacketReceived(ByteBuffer data)
-            throws IOException, InterruptedException, ExecutionException {
+            throws IOException, InterruptedException, ExecutionException, TimeoutException {
         Tunnel.Packet pkt = new Tunnel.Packet(data);
         int cmd = pkt.getCommand();
 
@@ -514,7 +515,8 @@ public class Tunnel extends EncryptedSocket {
         return ReadResult.CONTINUE;
     }
 
-    private void handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException {
+    private void handleREDY(REDYPacket pkt)
+            throws IOException, InterruptedException, ExecutionException, TimeoutException {
         // REDY packet from DEVISmart cloud is empty, nothing to do with it.
         // REDY packet from a device contains its built-in license key
         // in the same format as in VOCH packet, sent by us.
@@ -522,7 +524,7 @@ public class Tunnel extends EncryptedSocket {
         connection.handleReadyPacket();
     }
 
-    private void sendPacket(Tunnel.Packet pkt) throws InterruptedException, ExecutionException {
+    private void sendPacket(Tunnel.Packet pkt) throws InterruptedException, ExecutionException, TimeoutException {
         logger.trace("Sending packet: {}", pkt);
         connection.sendRawData(pkt.getData());
     }
@@ -532,7 +534,7 @@ public class Tunnel extends EncryptedSocket {
     }
 
     @Override
-    public ReadResult establish() throws IOException, InterruptedException, ExecutionException {
+    public ReadResult establish() throws IOException, InterruptedException, ExecutionException, TimeoutException {
         // Initialize nonce counter
         nonce = 0;
         // Start encrypted tunnel establishment by sending TELL packet
@@ -542,7 +544,7 @@ public class Tunnel extends EncryptedSocket {
     }
 
     @Override
-    public void sendData(byte[] data) throws IOException, InterruptedException, ExecutionException {
+    public void sendData(byte[] data) throws IOException, InterruptedException, ExecutionException, TimeoutException {
         sendPacket(new MESGPacket(getNonce(), beforeNm, data));
     }
 

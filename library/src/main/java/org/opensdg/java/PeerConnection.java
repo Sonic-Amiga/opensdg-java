@@ -5,6 +5,8 @@ import java.io.InputStream;
 import java.net.ProtocolException;
 import java.rmi.RemoteException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.xml.bind.DatatypeConverter;
 
@@ -34,9 +36,10 @@ public class PeerConnection extends Connection {
      * @param grid master connection to use
      * @param peerId ID (AKA public key) of the peer to call
      * @param protocol application-specific protocol ID
+     * @throws TimeoutException
      */
     public void connectToRemote(GridConnection grid, byte[] peerId, String protocol)
-            throws IOException, InterruptedException, ExecutionException {
+            throws IOException, InterruptedException, ExecutionException, TimeoutException {
         init(grid);
 
         /*
@@ -62,7 +65,7 @@ public class PeerConnection extends Connection {
         // First ask our grid to make tunnel for us
         // DatatypeConverter produces upper case, but the Grid wants only lower
         String peerStr = DatatypeConverter.printHexBinary(peerId).toLowerCase();
-        PeerReply reply = grid.connectToPeer(peerStr, protocol).get();
+        PeerReply reply = grid.connectToPeer(peerStr, protocol).get(timeout, TimeUnit.SECONDS);
 
         startForwarding(reply);
     }
@@ -74,7 +77,8 @@ public class PeerConnection extends Connection {
         tunnel = grid.tunnel.makePeerTunnel(this);
     }
 
-    protected void startForwarding(PeerReply reply) throws IOException, InterruptedException, ExecutionException {
+    protected void startForwarding(PeerReply reply)
+            throws IOException, InterruptedException, ExecutionException, TimeoutException {
         if (reply.getResult() != 0) {
             // This may happen if e. g. there's no such peer ID on the Grid.
             // It seems that error code would always be 1, but we report it just in case
@@ -151,8 +155,10 @@ public class PeerConnection extends Connection {
      * Receive a single data packet synchronously
      *
      * @return data received or null on EOF
+     * @throws TimeoutException
      */
-    public @Nullable InputStream receiveData() throws IOException, InterruptedException, ExecutionException {
+    public @Nullable InputStream receiveData()
+            throws IOException, InterruptedException, ExecutionException, TimeoutException {
         ReadResult ret = tunnel.receiveRawPacket();
 
         if (ret == ReadResult.EOF) {
@@ -166,8 +172,10 @@ public class PeerConnection extends Connection {
      * Send a single data packet synchronously
      *
      * @param data data to send
+     * @throws TimeoutException
      */
-    public void sendData(byte[] data) throws ProtocolException, IOException, InterruptedException, ExecutionException {
+    public void sendData(byte[] data)
+            throws ProtocolException, IOException, InterruptedException, ExecutionException, TimeoutException {
         tunnel.sendData(data);
     }
 }

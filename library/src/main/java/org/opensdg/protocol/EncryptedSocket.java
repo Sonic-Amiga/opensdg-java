@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.ProtocolException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 import org.opensdg.java.Connection;
 
@@ -29,9 +30,11 @@ public abstract class EncryptedSocket extends SocketProtocol {
     /**
      * Send data over the encrypted channel
      *
+     * @throws TimeoutException
+     *
      */
     abstract public void sendData(byte[] data)
-            throws ProtocolException, IOException, InterruptedException, ExecutionException;
+            throws ProtocolException, IOException, InterruptedException, ExecutionException, TimeoutException;
 
     /**
      * Get received data

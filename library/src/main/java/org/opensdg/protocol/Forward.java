@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.rmi.RemoteException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 import org.opensdg.java.Connection;
 import org.opensdg.java.Connection.ReadResult;
@@ -134,12 +135,12 @@ public class Forward extends SocketProtocol {
     }
 
     @Override
-    public ReadResult establish() throws IOException, InterruptedException, ExecutionException {
+    public ReadResult establish() throws IOException, InterruptedException, ExecutionException, TimeoutException {
         sendPacket(new ForwardRequest(tunnelId));
         return super.establish();
     }
 
-    private void sendPacket(Forward.Packet pkt) throws InterruptedException, ExecutionException {
+    private void sendPacket(Forward.Packet pkt) throws InterruptedException, ExecutionException, TimeoutException {
         logger.trace("Sending packet: {}", pkt);
         connection.sendRawData(pkt.getData());
     }

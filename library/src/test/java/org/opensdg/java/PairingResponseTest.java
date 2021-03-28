@@ -2,10 +2,7 @@ package org.opensdg.java;
 
 import static org.junit.jupiter.api.Assertions.fail;
 
-import java.io.IOException;
-import java.security.GeneralSecurityException;
 import java.util.ArrayDeque;
-import java.util.concurrent.ExecutionException;
 
 import javax.xml.bind.DatatypeConverter;
 
@@ -46,7 +43,7 @@ class PairingResponseTest {
 
         try {
             pairing.pairWithRemote(grid, otp);
-        } catch (InterruptedException | ExecutionException | IOException | GeneralSecurityException e) {
+        } catch (Exception e) {
             fail("pairWithRemote() failed: " + e.toString());
         }
 

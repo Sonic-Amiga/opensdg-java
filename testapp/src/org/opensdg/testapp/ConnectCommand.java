@@ -1,8 +1,5 @@
 package org.opensdg.testapp;
 
-import java.io.IOException;
-import java.util.concurrent.ExecutionException;
-
 import javax.xml.bind.DatatypeConverter;
 
 import org.opensdg.java.PeerConnection;
@@ -29,7 +26,7 @@ public class ConnectCommand extends CommandHandler {
 
         try {
             conn.connectToRemote(Main.grid, peerId, protocol);
-        } catch (IOException | InterruptedException | ExecutionException e) {
+        } catch (Exception e) {
             Main.printError("Failed to connect to peer", e);
             return;
         }
