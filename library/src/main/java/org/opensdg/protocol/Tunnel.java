@@ -522,7 +522,7 @@ public class Tunnel extends EncryptedSocket {
         connection.handleReadyPacket();
     }
 
-    private void sendPacket(Tunnel.Packet pkt) throws IOException, InterruptedException, ExecutionException {
+    private void sendPacket(Tunnel.Packet pkt) throws InterruptedException, ExecutionException {
         logger.trace("Sending packet: {}", pkt);
         connection.sendRawData(pkt.getData());
     }
@@ -542,7 +542,7 @@ public class Tunnel extends EncryptedSocket {
     }
 
     @Override
-    public void sendData(byte[] data) throws ProtocolException, IOException, InterruptedException, ExecutionException {
+    public void sendData(byte[] data) throws IOException, InterruptedException, ExecutionException {
         sendPacket(new MESGPacket(getNonce(), beforeNm, data));
     }
 

@@ -120,7 +120,7 @@ public abstract class Connection {
      * Keeps writing synchronously until the full packet has been written
      *
      */
-    public synchronized void sendRawData(ByteBuffer data) throws IOException, InterruptedException, ExecutionException {
+    public synchronized void sendRawData(ByteBuffer data) throws InterruptedException, ExecutionException {
         int size = data.capacity();
 
         data.position(0);

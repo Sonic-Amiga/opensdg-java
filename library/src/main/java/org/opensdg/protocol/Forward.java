@@ -139,7 +139,7 @@ public class Forward extends SocketProtocol {
         return super.establish();
     }
 
-    private void sendPacket(Forward.Packet pkt) throws IOException, InterruptedException, ExecutionException {
+    private void sendPacket(Forward.Packet pkt) throws InterruptedException, ExecutionException {
         logger.trace("Sending packet: {}", pkt);
         connection.sendRawData(pkt.getData());
     }
