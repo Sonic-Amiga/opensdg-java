@@ -4,7 +4,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
-import java.net.ProtocolException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.AsynchronousSocketChannel;
@@ -172,10 +171,6 @@ public abstract class Connection {
 
     public int syncReceive(ByteBuffer buffer) throws InterruptedException, ExecutionException {
         return s.read(buffer).get();
-    }
-
-    protected InputStream getPayload() throws ProtocolException {
-        return tunnel.getData();
     }
 
     public abstract void handleReadyPacket() throws IOException, InterruptedException, ExecutionException;

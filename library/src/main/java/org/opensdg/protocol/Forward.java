@@ -32,15 +32,15 @@ import com.google.protobuf.ByteString;
 public class Forward extends SocketProtocol {
     private final Logger logger = LoggerFactory.getLogger(Forward.class);
 
-    public static final byte MSG_FORWARD_REQUEST = 0;
-    public static final byte MSG_FORWARD_HOLD = 1;
-    public static final byte MSG_FORWARD_REPLY = 2;
-    public static final byte MSG_FORWARD_ERROR = 3;
+    private static final byte MSG_FORWARD_REQUEST = 0;
+    private static final byte MSG_FORWARD_HOLD = 1;
+    private static final byte MSG_FORWARD_REPLY = 2;
+    private static final byte MSG_FORWARD_ERROR = 3;
 
     private static final int FORWARD_REMOTE_MAGIC = 0xF09D8C95;
     private static final String FORWARD_REMOTE_SIGNATURE = "Mdg-NaCl/binary";
 
-    public static class Packet {
+    private static class Packet {
         private ByteBuffer data;
 
         Packet(byte cmd, AbstractMessage msg) throws IOException {
@@ -76,7 +76,7 @@ public class Forward extends SocketProtocol {
 
     }
 
-    public static class ForwardRequest extends Packet {
+    private static class ForwardRequest extends Packet {
         public ForwardRequest(ByteString tunnelId) throws IOException {
             super(MSG_FORWARD_REQUEST,
                     ForwardProtocol.ForwardRequest.newBuilder().setMagic(FORWARD_REMOTE_MAGIC)
@@ -90,7 +90,7 @@ public class Forward extends SocketProtocol {
         }
     }
 
-    public static class ForwardReply extends Packet {
+    private static class ForwardReply extends Packet {
         public ForwardReply(ByteBuffer buffer) throws IOException {
             super(buffer);
 
@@ -108,7 +108,7 @@ public class Forward extends SocketProtocol {
         }
     }
 
-    public static class ForwardError extends Packet {
+    private static class ForwardError extends Packet {
         private ForwardProtocol.ForwardError msg;
 
         public ForwardError(ByteBuffer buffer) throws IOException {

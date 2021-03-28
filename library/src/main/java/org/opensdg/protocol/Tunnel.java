@@ -91,7 +91,7 @@ public class Tunnel extends EncryptedSocket {
         }
     }
 
-    public static class Packet {
+    private static class Packet {
         public static final short HEADER_SIZE = 10;
         private static final int MAGIC = 0xf09f909f;
         protected ByteBuffer data;
@@ -168,7 +168,7 @@ public class Tunnel extends EncryptedSocket {
         }
     }
 
-    public static class EncryptedPacket extends Packet {
+    private static class EncryptedPacket extends Packet {
         private int box_size;
         protected ByteBuffer decrypted;
 
@@ -227,22 +227,22 @@ public class Tunnel extends EncryptedSocket {
     }
 
     // Command codes
-    public static final int CMD_TELL = CMD('T', 'E', 'L', 'L');
-    public static final int CMD_WELC = CMD('W', 'E', 'L', 'C');
-    public static final int CMD_HELO = CMD('H', 'E', 'L', 'O');
-    public static final int CMD_COOK = CMD('C', 'O', 'O', 'K');
-    public static final int CMD_VOCH = CMD('V', 'O', 'C', 'H');
-    public static final int CMD_REDY = CMD('R', 'E', 'D', 'Y');
-    public static final int CMD_MESG = CMD('M', 'E', 'S', 'G');
+    private static final int CMD_TELL = CMD('T', 'E', 'L', 'L');
+    private static final int CMD_WELC = CMD('W', 'E', 'L', 'C');
+    private static final int CMD_HELO = CMD('H', 'E', 'L', 'O');
+    private static final int CMD_COOK = CMD('C', 'O', 'O', 'K');
+    private static final int CMD_VOCH = CMD('V', 'O', 'C', 'H');
+    private static final int CMD_REDY = CMD('R', 'E', 'D', 'Y');
+    private static final int CMD_MESG = CMD('M', 'E', 'S', 'G');
 
-    public static class TELLPacket extends Packet {
+    private static class TELLPacket extends Packet {
         // TELL packet has no payload
         public TELLPacket() {
             super(0, CMD_TELL);
         }
     }
 
-    public static class WELCPacket extends Packet {
+    private static class WELCPacket extends Packet {
         public WELCPacket(Packet pkt) throws ProtocolException {
             super(pkt, SDG.KEY_SIZE);
         }
@@ -257,7 +257,7 @@ public class Tunnel extends EncryptedSocket {
         }
     }
 
-    public static class HELOPacket extends Packet {
+    private static class HELOPacket extends Packet {
         public static final int ZEROMSG_SIZE = 80;
 
         public HELOPacket(byte[] serverPk, byte[] clientPk, byte[] clientSk, long nonce) throws ProtocolException {
@@ -288,7 +288,7 @@ public class Tunnel extends EncryptedSocket {
         }
     }
 
-    public static class COOKPacket extends EncryptedPacket {
+    private static class COOKPacket extends EncryptedPacket {
         public COOKPacket(Packet pkt, byte[] serverPk, byte[] clientSk) throws ProtocolException {
             super(pkt, LONG_NONCE_SIZE, SDG.KEY_SIZE + COOKIE_SIZE);
 
@@ -311,7 +311,7 @@ public class Tunnel extends EncryptedSocket {
         }
     }
 
-    public static class VOCHPacket extends EncryptedPacket {
+    private static class VOCHPacket extends EncryptedPacket {
         private static final int INNER_BOX_SIZE = INNER_PAD + SDG.KEY_SIZE;
         private static final String CERTIFICATE_PREFIX = "certificate";
         private static final int CERTIFICATE_PREFIX_SIZE = CERTIFICATE_PREFIX.length() + 3;
@@ -372,7 +372,7 @@ public class Tunnel extends EncryptedSocket {
         }
     }
 
-    public static class DataPacket extends EncryptedPacket {
+    private static class DataPacket extends EncryptedPacket {
         protected DataPacket(int raw_portion_size, int encrypted_data_size, int cmd) {
             super(raw_portion_size, encrypted_data_size, cmd);
         }
@@ -406,7 +406,7 @@ public class Tunnel extends EncryptedSocket {
     }
 
     // REDY packet is identical to MESG with the only difference being nonce prefix
-    public static class REDYPacket extends DataPacket {
+    private static class REDYPacket extends DataPacket {
         public REDYPacket(Packet pkt, byte[] beforenm) throws ProtocolException {
             super(pkt, "CurveCP-server-R", beforenm);
         }
@@ -420,7 +420,7 @@ public class Tunnel extends EncryptedSocket {
         }
     }
 
-    public static class MESGPacket extends DataPacket {
+    private static class MESGPacket extends DataPacket {
         public MESGPacket(Packet pkt, byte[] beforenm) throws ProtocolException {
             super(pkt, "CurveCP-server-M", beforenm);
         }
@@ -449,12 +449,12 @@ public class Tunnel extends EncryptedSocket {
         }
     }
 
-    protected byte[] clientPubkey;
-    protected byte[] clientPrivkey;
-    protected byte[] serverPubkey;
+    private byte[] clientPubkey;
+    private byte[] clientPrivkey;
+    private byte[] serverPubkey;
     private byte[] tempPubkey;
     private byte[] tempPrivkey;
-    protected byte[] beforeNm;
+    private byte[] beforeNm;
     private long nonce;
 
     public Tunnel(Connection conn, byte[] privKey) {
