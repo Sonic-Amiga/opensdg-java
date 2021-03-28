@@ -52,8 +52,10 @@ public abstract class Connection {
                         break;
 
                 }
-                // Continue receiving
-                conn.asyncReceive();
+                // Continue receiving if not closed
+                if (conn.state != State.CLOSED) {
+                    conn.asyncReceive();
+                }
             } catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
                 conn.handleError(e);
             }
@@ -81,11 +83,13 @@ public abstract class Connection {
         return new EOFException("Connection closed by peer");
     }
 
-    protected State state = State.CLOSED;
+    private State state = State.CLOSED;
     protected int timeout = 10;
 
     private AsynchronousSocketChannel s;
     protected EncryptedSocket tunnel;
+    private Object writeLock = new Object();
+    private Object closeLock = new Object();
 
     private CompletionHandler<Integer, Connection> readHandler = new ReadHandler();
 
@@ -104,18 +108,24 @@ public abstract class Connection {
      *
      */
     public void close() throws IOException {
-        if (state == State.CLOSED) {
-            return;
+        synchronized (closeLock) {
+            if (state != State.CLOSED) {
+                handleClose();
+                setState(State.CLOSED);
+
+                AsynchronousSocketChannel ch = s;
+                s = null;
+
+                // This can throw, so do it in the last turn
+                if (ch != null) {
+                    ch.close();
+                }
+            }
         }
+    }
 
-        AsynchronousSocketChannel ch = s;
-        s = null;
+    protected void handleClose() {
 
-        if (ch != null) {
-            ch.close();
-        }
-
-        state = State.CLOSED;
     }
 
     /**
@@ -126,15 +136,16 @@ public abstract class Connection {
      * @throws TimeoutException
      *
      */
-    public synchronized void sendRawData(ByteBuffer data)
-            throws InterruptedException, ExecutionException, TimeoutException {
+    public void sendRawData(ByteBuffer data) throws InterruptedException, ExecutionException, TimeoutException {
         int size = data.capacity();
 
         data.position(0);
 
-        while (size > 0) {
-            int ret = s.write(data).get(timeout, TimeUnit.SECONDS);
-            size -= ret;
+        synchronized (writeLock) {
+            while (size > 0) {
+                int ret = s.write(data).get(timeout, TimeUnit.SECONDS);
+                size -= ret;
+            }
         }
     }
 
@@ -196,7 +207,18 @@ public abstract class Connection {
             logger.debug("Async channel closed");
         } else {
             onError(exc);
+            try {
+                close();
+            } catch (IOException e) {
+                // In fact this should not happen
+                logger.error("Exception in close(): {}", e);
+            }
         }
+    }
+
+    protected void setState(State newState) {
+        logger.debug("State = {}", newState);
+        state = newState;
     }
 
     protected void checkState(State required) {
@@ -221,9 +243,7 @@ public abstract class Connection {
      * @param exc an error description
      */
     protected void onError(@NonNull Throwable exc) {
-        // It's strongly advised to handle these events, so let's log under error
-        // if the developer forgot to do so.
-        logger.error("Unhandled async I/O error:", exc);
+        logger.info("Async I/O error: {}", exc.toString());
     }
 
     /**

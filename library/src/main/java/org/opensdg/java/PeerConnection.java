@@ -72,7 +72,7 @@ public class PeerConnection extends Connection {
 
     protected void init(GridConnection grid) {
         checkState(State.CLOSED);
-        state = State.CONNECTING;
+        setState(State.CONNECTING);
         // Copy client keys from the grid connection.
         tunnel = grid.tunnel.makePeerTunnel(this);
     }
@@ -101,7 +101,7 @@ public class PeerConnection extends Connection {
 
     @Override
     public void handleReadyPacket() throws IOException, InterruptedException, ExecutionException {
-        state = State.CONNECTED;
+        setState(State.CONNECTED);
     }
 
     @Override

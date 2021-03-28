@@ -87,7 +87,6 @@ public class GridConnection extends Connection {
      */
     public GridConnection(byte[] key) {
         tunnel = new Tunnel(this, key);
-        pingScheduler = PingExecutorService.get();
         ownScheduler = true;
     }
 
@@ -138,9 +137,13 @@ public class GridConnection extends Connection {
         IOException lastErr = null;
 
         checkState(State.CLOSED);
-        state = State.CONNECTING;
+        setState(State.CONNECTING);
         pingSequence = 0;
         pingDelay = -1;
+
+        if (ownScheduler) {
+            pingScheduler = PingExecutorService.get();
+        }
 
         for (int i = 0; i < servers.length; i++) {
             try {
@@ -149,7 +152,7 @@ public class GridConnection extends Connection {
 
                 // Tunnel handshake also includes handling some MESG packets,
                 // the handler will set our state to CONNECTED when done
-                while (state != State.CONNECTED) {
+                while (getState() != State.CONNECTED) {
                     ReadResult ret = tunnel.receiveRawPacket();
 
                     if (ret == ReadResult.EOF) {
@@ -216,7 +219,7 @@ public class GridConnection extends Connection {
                 // Send the first PING immediately, again, this is the same thing
                 // as original mdglib does
                 ping();
-                state = Connection.State.CONNECTED;
+                setState(Connection.State.CONNECTED);
                 break;
 
             case Control.MSG_PONG:
@@ -347,6 +350,9 @@ public class GridConnection extends Connection {
 
     @Override
     protected void handleError(Throwable t) {
+        // Stop pinging
+        stopPing();
+
         // Report all pending ForwardRequests as failed
         ArrayList<ForwardRequest> queue;
 
@@ -363,20 +369,22 @@ public class GridConnection extends Connection {
     }
 
     @Override
-    public void close() throws IOException {
+    protected void handleClose() {
         // We need also to stop PINGs on close
+        stopPing();
+
+        if (ownScheduler) {
+            PingExecutorService.put();
+        }
+    }
+
+    private void stopPing() {
         ScheduledFuture<?> pendingPing = scheduledPing;
         scheduledPing = null;
 
         if (pendingPing != null) {
             pendingPing.cancel(true);
         }
-
-        if (ownScheduler) {
-            PingExecutorService.put();
-        }
-
-        super.close();
     }
 
     /**
