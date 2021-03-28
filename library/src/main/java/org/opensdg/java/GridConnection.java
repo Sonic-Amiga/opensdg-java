@@ -7,7 +7,6 @@ import java.net.ProtocolException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -39,7 +38,8 @@ public class GridConnection extends Connection {
     private int pingDelay;
     private long lastPing;
 
-    private ScheduledExecutorService pingScheduler = Executors.newScheduledThreadPool(1);
+    private ScheduledExecutorService pingScheduler;
+    private boolean ownScheduler;
     private ScheduledFuture<?> scheduledPing;
 
     private @NonNull ArrayList<ForwardRequest> forwardQueue = new ArrayList<ForwardRequest>();
@@ -87,6 +87,28 @@ public class GridConnection extends Connection {
      */
     public GridConnection(byte[] key) {
         tunnel = new Tunnel(this, key);
+        pingScheduler = PingExecutorService.get();
+        ownScheduler = true;
+    }
+
+    /**
+     * Creates a {@link GridConnection} with the given private key and own task scheduler
+     *
+     * The private key is used for connection encryption. The public key,
+     * also known as a peer ID, used to identify a host on the Grid, is also
+     * derived from the given private key
+     *
+     * A given {@link ScheduledExecutorService} will be used instead of internally provided one
+     * to schedule ping requests. This constructor is intended for use if a ScheduledExecutorService
+     * is already provided by the environment, e. g. OpenHAB.
+     *
+     * @param key a private key to use
+     * @param scheduler a ScheduledExecutorService
+     */
+    public GridConnection(byte[] key, ScheduledExecutorService scheduler) {
+        tunnel = new Tunnel(this, key);
+        pingScheduler = scheduler;
+        ownScheduler = false;
     }
 
     /**
@@ -329,7 +351,10 @@ public class GridConnection extends Connection {
             pendingPing.cancel(true);
         }
 
-        pingScheduler.shutdown();
+        if (ownScheduler) {
+            PingExecutorService.put();
+        }
+
         super.close();
     }
 
