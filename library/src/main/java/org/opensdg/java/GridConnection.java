@@ -52,8 +52,7 @@ public class GridConnection extends Connection {
             try {
                 GridConnection.this.ping();
             } catch (IOException | InterruptedException | ExecutionException e) {
-                // TODO Auto-generated catch block
-                GridConnection.this.onError(e);
+                GridConnection.this.handleError(e);
             }
         }
     };
@@ -339,6 +338,23 @@ public class GridConnection extends Connection {
             }
             request.reportError(e);
         }
+    }
+
+    @Override
+    protected void handleError(Throwable t) {
+        // Report all pending ForwardRequests as failed
+        ArrayList<ForwardRequest> queue;
+
+        synchronized (forwardQueue) {
+            queue = new ArrayList<ForwardRequest>(forwardQueue);
+            forwardQueue.clear();
+        }
+
+        for (ForwardRequest req : queue) {
+            req.reportError(t);
+        }
+
+        super.handleError(t);
     }
 
     @Override
