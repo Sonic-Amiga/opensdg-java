@@ -17,9 +17,7 @@ import org.opensdg.protocol.generated.ControlProtocol.PeerReply;
 public class MockPairingConnection extends PairingConnection {
     private Queue<byte[]> injectedData;
 
-    MockPairingConnection(byte[] serverPublicKey, byte[] beforenm, Queue<byte[]> packets) {
-        serverPubkey = serverPublicKey;
-        beforeNm = beforenm;
+    MockPairingConnection(Queue<byte[]> packets) {
         injectedData = packets;
     }
 
@@ -34,7 +32,7 @@ public class MockPairingConnection extends PairingConnection {
     }
 
     @Override
-    protected void sendMESG(byte[] data) {
+    public void sendData(byte[] data) {
         ByteArrayInputStream input = new ByteArrayInputStream(data);
 
         assertEquals(MSG_PAIRING_RESPONSE, input.read());

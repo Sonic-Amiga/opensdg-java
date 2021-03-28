@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.opensdg.protocol.Control;
+import org.opensdg.protocol.Tunnel;
 import org.opensdg.protocol.generated.ControlProtocol.ConnectToPeer;
 import org.opensdg.protocol.generated.ControlProtocol.PairRemote;
 import org.opensdg.protocol.generated.ControlProtocol.PeerReply;
@@ -85,8 +86,7 @@ public class GridConnection extends Connection {
      * @param key a private key to use
      */
     public GridConnection(byte[] key) {
-        clientPrivkey = key.clone();
-        clientPubkey = SDG.calcPublicKey(clientPrivkey);
+        tunnel = new Tunnel(this, key);
     }
 
     /**
@@ -126,13 +126,13 @@ public class GridConnection extends Connection {
                 // Tunnel handshake also includes handling some MESG packets,
                 // the handler will set our state to CONNECTED when done
                 while (state != State.CONNECTED) {
-                    ReadResult ret = receiveRawPacket();
+                    ReadResult ret = tunnel.receiveRawPacket();
 
                     if (ret == ReadResult.EOF) {
                         throw getEOFException();
                     }
 
-                    onPacketReceived();
+                    tunnel.onPacketReceived();
                 }
 
                 // Grid is always serviced asynchronously. The job of this connection now
@@ -153,7 +153,7 @@ public class GridConnection extends Connection {
     }
 
     @Override
-    protected void handleReadyPacket() throws IOException, InterruptedException, ExecutionException {
+    public void handleReadyPacket() throws IOException, InterruptedException, ExecutionException {
         // At this point the grid seems to be ready and subsequent steps are
         // probably optional. But let's do them just in case, to be as close
         // to original implementation as possible.
@@ -168,7 +168,7 @@ public class GridConnection extends Connection {
     }
 
     @Override
-    protected void handleDataPacket(InputStream data) throws IOException, InterruptedException, ExecutionException {
+    public void handleDataPacket(InputStream data) throws IOException, InterruptedException, ExecutionException {
         int msgType = data.read();
 
         switch (msgType) {
@@ -262,7 +262,7 @@ public class GridConnection extends Connection {
         out.write(cmd);
         msg.writeTo(out);
 
-        sendMESG(out.toByteArray());
+        tunnel.sendData(out.toByteArray());
     }
 
     ForwardRequest connectToPeer(String peerId, String protocol) {

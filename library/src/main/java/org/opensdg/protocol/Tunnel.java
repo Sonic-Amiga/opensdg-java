@@ -1,17 +1,34 @@
 package org.opensdg.protocol;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.ProtocolException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.concurrent.ExecutionException;
 
+import org.opensdg.java.Connection;
+import org.opensdg.java.Connection.Hexdump;
+import org.opensdg.java.Connection.ReadResult;
 import org.opensdg.java.InternalUtils;
 import org.opensdg.java.SDG;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.neilalexander.jnacl.crypto.curve25519xsalsa20poly1305;
 
-public class Tunnel {
+/**
+ * This class implements mdglib's binary encryption protocol
+ *
+ * The protocol is a modified version of CurveCP. Packet formats are different,
+ * plus some more nonce prefixes added
+ *
+ * @author Pavel Fedin
+ */
+public class Tunnel extends EncryptedSocket {
+    private final Logger logger = LoggerFactory.getLogger(Tunnel.class);
+
     private static int CMD(int a, int b, int c, int d) {
         return (a << 24) | (b << 16) | (c << 8) | d;
     }
@@ -430,5 +447,121 @@ public class Tunnel {
         public InputStream getPayload() {
             return new ByteArrayInputStream(decrypted.array(), OUTER_PAD + INNER_PAD + 2, getPayloadLength());
         }
+    }
+
+    protected byte[] clientPubkey;
+    protected byte[] clientPrivkey;
+    protected byte[] serverPubkey;
+    private byte[] tempPubkey;
+    private byte[] tempPrivkey;
+    protected byte[] beforeNm;
+    private long nonce;
+
+    public Tunnel(Connection conn, byte[] privKey) {
+        super(conn);
+        clientPrivkey = privKey.clone();
+        clientPubkey = SDG.calcPublicKey(clientPrivkey);
+    }
+
+    @Override
+    public Tunnel makePeerTunnel(Connection conn) {
+        Tunnel peer = new Tunnel(conn, clientPrivkey);
+        peer.clientPubkey = clientPubkey;
+        return peer;
+    }
+
+    @Override
+    ReadResult onPacketReceived(ByteBuffer data) throws IOException, InterruptedException, ExecutionException {
+        Tunnel.Packet pkt = new Tunnel.Packet(data);
+        int cmd = pkt.getCommand();
+
+        logger.trace("Received packet: {}", pkt);
+
+        if (cmd == CMD_WELC) {
+            serverPubkey = new WELCPacket(pkt).getPeerID();
+            logger.trace("Received server public key: {}", new Hexdump(serverPubkey));
+
+            tempPubkey = new byte[SDG.KEY_SIZE];
+            tempPrivkey = new byte[SDG.KEY_SIZE];
+            curve25519xsalsa20poly1305.crypto_box_keypair(tempPubkey, tempPrivkey);
+            logger.trace("Created short-term public key: {}", new Hexdump(tempPubkey));
+            logger.trace("Created short-term secret key: {}", new Hexdump(tempPrivkey));
+
+            sendPacket(new HELOPacket(serverPubkey, tempPubkey, tempPrivkey, getNonce()));
+        } else if (cmd == CMD_COOK) {
+            COOKPacket cook = new COOKPacket(pkt, serverPubkey, tempPrivkey);
+            byte[] tempServerPubkey = cook.getShortTermPubkey();
+            byte[] serverCookie = cook.getCookie();
+
+            logger.trace("Received server short-term public key: {}", new Hexdump(tempServerPubkey));
+            logger.trace("Received server cookie: {}", new Hexdump(serverCookie));
+
+            beforeNm = new byte[curve25519xsalsa20poly1305.crypto_secretbox_BEFORENMBYTES];
+            curve25519xsalsa20poly1305.crypto_box_beforenm(beforeNm, tempServerPubkey, tempPrivkey);
+
+            sendPacket(new VOCHPacket(serverCookie, getNonce(), beforeNm, serverPubkey, clientPrivkey, clientPubkey,
+                    tempPubkey, null));
+        } else if (cmd == CMD_REDY) {
+            handleREDY(new REDYPacket(pkt, beforeNm));
+            return ReadResult.DONE;
+        } else if (cmd == CMD_MESG) {
+            connection.handleDataPacket(new MESGPacket(pkt, beforeNm).getPayload());
+        } else {
+            throw new ProtocolException("Unknown packet received: " + pkt.toString());
+        }
+
+        return ReadResult.CONTINUE;
+    }
+
+    private void handleREDY(REDYPacket pkt) throws IOException, InterruptedException, ExecutionException {
+        // REDY packet from DEVISmart cloud is empty, nothing to do with it.
+        // REDY packet from a device contains its built-in license key
+        // in the same format as in VOCH packet, sent by us.
+        // Being an opensource project we simply don't care about it.
+        connection.handleReadyPacket();
+    }
+
+    private void sendPacket(Tunnel.Packet pkt) throws IOException, InterruptedException, ExecutionException {
+        logger.trace("Sending packet: {}", pkt);
+        connection.sendRawData(pkt.getData());
+    }
+
+    private long getNonce() {
+        return nonce++;
+    }
+
+    @Override
+    public ReadResult establish() throws IOException, InterruptedException, ExecutionException {
+        // Initialize nonce counter
+        nonce = 0;
+        // Start encrypted tunnel establishment by sending TELL packet
+        sendPacket(new TELLPacket());
+
+        return super.establish();
+    }
+
+    @Override
+    public void sendData(byte[] data) throws ProtocolException, IOException, InterruptedException, ExecutionException {
+        sendPacket(new MESGPacket(getNonce(), beforeNm, data));
+    }
+
+    @Override
+    public InputStream getData() throws ProtocolException {
+        return new MESGPacket(detachBuffer(), beforeNm).getPayload();
+    }
+
+    @Override
+    public byte[] getPeerId() {
+        return serverPubkey;
+    }
+
+    @Override
+    public byte[] getMyPeerId() {
+        return clientPubkey;
+    }
+
+    @Override
+    public byte[] getBeforeNm() {
+        return beforeNm;
     }
 }

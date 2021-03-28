@@ -77,8 +77,7 @@ public class PeerConnection extends Connection {
         checkState(State.CLOSED);
         state = State.CONNECTING;
         // Copy client keys from the grid connection.
-        clientPubkey = grid.clientPubkey;
-        clientPrivkey = grid.clientPrivkey;
+        tunnel = grid.tunnel.makePeerTunnel(this);
     }
 
     protected void startForwarding(PeerReply reply) throws IOException, InterruptedException, ExecutionException {
@@ -100,13 +99,13 @@ public class PeerConnection extends Connection {
 
         ReadResult ret;
         do {
-            ret = receiveRawPacket();
+            ret = tunnel.receiveRawPacket();
 
             if (ret == ReadResult.EOF) {
                 throw getEOFException();
             }
 
-            ret = handleFwdPacket(detachBuffer());
+            ret = handleFwdPacket(tunnel.detachBuffer());
         } while (ret == ReadResult.CONTINUE);
 
         startTunnel();
@@ -118,12 +117,12 @@ public class PeerConnection extends Connection {
     }
 
     @Override
-    protected void handleReadyPacket() throws IOException, InterruptedException, ExecutionException {
+    public void handleReadyPacket() throws IOException, InterruptedException, ExecutionException {
         state = State.CONNECTED;
     }
 
     @Override
-    protected void handleDataPacket(InputStream data) throws IOException, InterruptedException, ExecutionException {
+    public void handleDataPacket(InputStream data) throws IOException, InterruptedException, ExecutionException {
         // Pass the data over to the client
         onDataReceived(handleProtocolBugs(data));
     }
@@ -192,7 +191,7 @@ public class PeerConnection extends Connection {
      * @return data received or null on EOF
      */
     public @Nullable InputStream receiveData() throws IOException, InterruptedException, ExecutionException {
-        ReadResult ret = receiveRawPacket();
+        ReadResult ret = tunnel.receiveRawPacket();
 
         if (ret == ReadResult.EOF) {
             return null;
@@ -207,6 +206,6 @@ public class PeerConnection extends Connection {
      * @param data data to send
      */
     public void sendData(byte[] data) throws ProtocolException, IOException, InterruptedException, ExecutionException {
-        sendMESG(data);
+        tunnel.sendData(data);
     }
 }

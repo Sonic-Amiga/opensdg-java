@@ -22,10 +22,6 @@ class PairingResponseTest {
 
     static final byte[] clientPrivkey = DatatypeConverter.parseHexBinary(
             "97BF03FADD1DC842856368A44F84EA3B399F9A96C0BB2835BE00C11D4934F495529B3955D4BA7A76AEF2D1F9ACFE24D1ABD771E70A5D8779646DBF6192329ED0");
-    static final byte[] serverPubkey = DatatypeConverter.parseHexBinary(
-            "314164D582A29A9A239D01158BE40BE37CC46EFE1EF60F3F7F396F91FF0266CB44CDE20409DB4BF509B8EF4E98C4AF58C62AF67DE34209DD4D35F619322B238F");
-    static final byte[] beforenm = DatatypeConverter
-            .parseHexBinary("A5EFF81AD594D5A11F42120170249DEE0BDC16FE512DB291C48EC024DE4081E9");
 
     static final byte[] X = DatatypeConverter
             .parseHexBinary("5D4F9A5980C946224C33A400932716131E9560558E9F4154F7740A4642BAFC5D");
@@ -46,7 +42,7 @@ class PairingResponseTest {
         packets.add(new ResultPacket(result).getData());
 
         MockGrid grid = new MockGrid(clientPrivkey);
-        MockPairingConnection pairing = new MockPairingConnection(serverPubkey, beforenm, packets);
+        MockPairingConnection pairing = new MockPairingConnection(packets);
 
         try {
             pairing.pairWithRemote(grid, otp);

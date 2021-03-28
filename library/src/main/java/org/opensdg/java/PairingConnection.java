@@ -93,8 +93,8 @@ public class PairingConnection extends PeerConnection {
                 MessageDigest sha512 = MessageDigest.getInstance("SHA-512");
 
                 System.arraycopy(otp.getBytes(), 0, buf, 0, l);
-                System.arraycopy(clientPubkey, 0, buf, l, SDG.KEY_SIZE);
-                System.arraycopy(serverPubkey, 0, buf, l + SDG.KEY_SIZE, SDG.KEY_SIZE);
+                System.arraycopy(getMyPeerId(), 0, buf, l, SDG.KEY_SIZE);
+                System.arraycopy(getPeerId(), 0, buf, l + SDG.KEY_SIZE, SDG.KEY_SIZE);
                 sha512.update(buf, 0, l + SDG.KEY_SIZE * 2);
                 sha512.digest(innerHash, 0, SHA512_LENGTH);
 
@@ -106,7 +106,7 @@ public class PairingConnection extends PeerConnection {
                 byte[] xor = new byte[SCALARMULT_BYTES];
                 xsalsa20.crypto_stream_xor(xor, challenge.getY(), SCALARMULT_BYTES, challenge.getNonce(), hash);
 
-                byte[] base = InternalUtils.crypto_scalarmult_base(beforeNm);
+                byte[] base = InternalUtils.crypto_scalarmult_base(tunnel.getBeforeNm());
                 byte[] p1 = crypto_scalarmult(xor, base);
                 byte[] rnd = InternalUtils.randomBytes(SCALARMULT_BYTES);
                 byte[] responseX = crypto_scalarmult(rnd, p1);
