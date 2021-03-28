@@ -20,12 +20,23 @@ public abstract class EncryptedSocket extends SocketProtocol {
         super(conn);
     }
 
-    @Override
+    /**
+     * Make another EncryptedSocket, inheriting credentials from this one
+     *
+     */
     abstract public EncryptedSocket makePeerTunnel(Connection conn);
 
+    /**
+     * Send data over the encrypted channel
+     *
+     */
     abstract public void sendData(byte[] data)
             throws ProtocolException, IOException, InterruptedException, ExecutionException;
 
+    /**
+     * Get received data
+     *
+     */
     abstract public InputStream getData() throws ProtocolException;
 
     // These may be not appropriate for different protocols, but i don't know

@@ -9,13 +9,29 @@ import java.io.InputStream;
 import java.net.ProtocolException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.rmi.RemoteException;
+import java.util.concurrent.ExecutionException;
 
+import org.opensdg.java.Connection;
+import org.opensdg.java.Connection.ReadResult;
 import org.opensdg.protocol.generated.ForwardProtocol;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.ByteString;
 
-public class Forward {
+/**
+ * This class implements forwarding protocol
+ *
+ * The protocol runs unencrypted on a peer socket and tells the Grid
+ * to forward the connection to to the actual peer.
+ *
+ * @author Pavel Fedin
+ */
+public class Forward extends SocketProtocol {
+    private final Logger logger = LoggerFactory.getLogger(Forward.class);
+
     public static final byte MSG_FORWARD_REQUEST = 0;
     public static final byte MSG_FORWARD_HOLD = 1;
     public static final byte MSG_FORWARD_REPLY = 2;
@@ -107,6 +123,49 @@ public class Forward {
         @Override
         public String toString() {
             return "FORWARD_ERROR " + msg.getCode();
+        }
+    }
+
+    public Forward(Connection conn) {
+        super(conn);
+    }
+
+    public ReadResult establish(ByteString tunnelId) throws IOException, InterruptedException, ExecutionException {
+        sendPacket(new ForwardRequest(tunnelId));
+        return super.establish();
+    }
+
+    private void sendPacket(Forward.Packet pkt) throws IOException, InterruptedException, ExecutionException {
+        logger.trace("Sending packet: {}", pkt);
+        connection.sendRawData(pkt.getData());
+    }
+
+    @Override
+    ReadResult onPacketReceived(ByteBuffer data) throws IOException, InterruptedException, ExecutionException {
+        byte cmd = data.get(2);
+
+        switch (cmd) {
+            case MSG_FORWARD_HOLD:
+                // Sometimes before MSG_FORWARD_REPLY a three byte packet arrives,
+                // containing MSG_FORWARD_HOLD command. Ignore it. I don't know what this
+                // is for; the name comes from LUA source code for old version of mdglib
+                // found in DanfossLink application by Christian Christiansen. Huge
+                // thanks for his reverse engineering effort!!!
+                logger.trace("Received packet: FORWARD_HOLD");
+                return ReadResult.CONTINUE;
+
+            case MSG_FORWARD_REPLY:
+                ForwardReply reply = new ForwardReply(data);
+                logger.trace("Received packet: {}", reply);
+                return ReadResult.DONE;
+
+            case MSG_FORWARD_ERROR:
+                ForwardError fwdErr = new ForwardError(data);
+                logger.trace("Received packet: {}", fwdErr);
+                throw new RemoteException("Connection refused by peer: " + fwdErr.getCode());
+
+            default:
+                throw new ProtocolException("Unknown forwarding packet received: " + cmd);
         }
     }
 }

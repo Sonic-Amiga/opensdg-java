@@ -37,8 +37,7 @@ public abstract class SocketProtocol {
         ReadResult ret;
 
         do {
-            getBuffer();
-            int size = connection.syncReceive(receiveBuffer);
+            int size = connection.syncReceive(getBuffer());
 
             ret = onRawDataReceived(size);
         } while (ret == ReadResult.CONTINUE);
@@ -92,8 +91,7 @@ public abstract class SocketProtocol {
         return receiveBuffer;
     }
 
-    // TEMP HACK, should be protected
-    public ByteBuffer detachBuffer() {
+    protected ByteBuffer detachBuffer() {
         ByteBuffer buffer = receiveBuffer;
 
         receiveBuffer = null;
@@ -118,8 +116,6 @@ public abstract class SocketProtocol {
     public ReadResult onPacketReceived() throws IOException, InterruptedException, ExecutionException {
         return onPacketReceived(detachBuffer());
     }
-
-    abstract public SocketProtocol makePeerTunnel(Connection conn);
 
     /**
      * Parse an incoming raw packet

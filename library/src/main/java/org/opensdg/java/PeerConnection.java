@@ -1,11 +1,8 @@
 package org.opensdg.java;
 
-import static org.opensdg.protocol.Forward.*;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ProtocolException;
-import java.nio.ByteBuffer;
 import java.rmi.RemoteException;
 import java.util.concurrent.ExecutionException;
 
@@ -13,9 +10,6 @@ import javax.xml.bind.DatatypeConverter;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.opensdg.protocol.Forward;
-import org.opensdg.protocol.Forward.ForwardError;
-import org.opensdg.protocol.Forward.ForwardReply;
-import org.opensdg.protocol.Forward.ForwardRequest;
 import org.opensdg.protocol.Tunnel.MESGPacket;
 import org.opensdg.protocol.generated.ControlProtocol.PeerInfo;
 import org.opensdg.protocol.generated.ControlProtocol.PeerReply;
@@ -94,26 +88,11 @@ public class PeerConnection extends Connection {
         logger.debug("ForwardRequest #{}: created tunnel {}", reply.getId(), new Hexdump(tunnelId.toByteArray()));
 
         openSocket(host.getHost(), host.getPort());
-        // We're now connected to one of grid servers, ask it to forward us to our peer
-        sendPacket(new ForwardRequest(tunnelId));
 
-        ReadResult ret;
-        do {
-            ret = tunnel.receiveRawPacket();
-
-            if (ret == ReadResult.EOF) {
-                throw getEOFException();
-            }
-
-            ret = handleFwdPacket(tunnel.detachBuffer());
-        } while (ret == ReadResult.CONTINUE);
+        Forward fwd = new Forward(this);
+        fwd.establish(tunnelId);
 
         startTunnel();
-    }
-
-    private void sendPacket(Forward.Packet pkt) throws IOException, InterruptedException, ExecutionException {
-        logger.trace("Sending packet: {}", pkt);
-        sendRawData(pkt.getData());
     }
 
     @Override
@@ -143,35 +122,6 @@ public class PeerConnection extends Connection {
         // Data is discarded only once
         discardFirstBytes = 0;
         return data;
-    }
-
-    private ReadResult handleFwdPacket(ByteBuffer buffer) throws IOException {
-        // Forwarding protocol isn't encapsulated, handle it first
-        byte cmd = buffer.get(2);
-
-        switch (cmd) {
-            case MSG_FORWARD_HOLD:
-                // Sometimes before MSG_FORWARD_REPLY a three byte packet arrives,
-                // containing MSG_FORWARD_HOLD command. Ignore it. I don't know what this
-                // is for; the name comes from LUA source code for old version of mdglib
-                // found in DanfossLink application by Christian Christiansen. Huge
-                // thanks for his reverse engineering effort!!!
-                logger.trace("Received packet: FORWARD_HOLD");
-                return ReadResult.CONTINUE;
-
-            case MSG_FORWARD_REPLY:
-                ForwardReply reply = new ForwardReply(buffer);
-                logger.trace("Received packet: {}", reply);
-                return ReadResult.DONE;
-
-            case MSG_FORWARD_ERROR:
-                ForwardError fwdErr = new ForwardError(buffer);
-                logger.trace("Received packet: {}", fwdErr);
-                throw new RemoteException("Connection refused by peer: " + fwdErr.getCode());
-
-            default:
-                throw new ProtocolException("Unknown forwarding packet received: " + cmd);
-        }
     }
 
     /**
