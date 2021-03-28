@@ -112,14 +112,6 @@ public abstract class Connection {
     }
 
     /**
-     * Establish encrypted tunnel on this Connection
-     *
-     */
-    protected void startTunnel() throws IOException, InterruptedException, ExecutionException {
-        tunnel.establish();
-    }
-
-    /**
      * Close the connection
      *
      * For convenience it's allowed to call close() on an already closed
@@ -162,10 +154,10 @@ public abstract class Connection {
      * Start asynchronous data receiving
      *
      * Initiates asynchronous data handling on the Connection.
-     * {@link onDataReceived} or {@link onError} will be called accordingly
+     * {@link handleReadyPacket}, {@link handleDataPacket} or {@link onError} will be called accordingly
      *
      */
-    public void asyncReceive() {
+    protected void asyncReceive() {
         s.read(tunnel.getBuffer(), this, readHandler);
     }
 

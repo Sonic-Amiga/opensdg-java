@@ -86,12 +86,12 @@ public class PeerConnection extends Connection {
 
         logger.debug("ForwardRequest #{}: created tunnel {}", reply.getId(), new Hexdump(tunnelId.toByteArray()));
 
+        // Connect to the endpoint
         openSocket(host.getHost(), host.getPort());
-
-        Forward fwd = new Forward(this);
-        fwd.establish(tunnelId);
-
-        startTunnel();
+        // Forward ourselves to the peer
+        new Forward(tunnelId, this).establish();
+        // Establish the encrypted connection
+        tunnel.establish();
     }
 
     @Override
@@ -132,6 +132,18 @@ public class PeerConnection extends Connection {
         // It's strongly advised to handle these events, so let's log under error
         // if the developer forgot to do so.
         logger.error("Unhandled async data receive");
+    }
+
+    /**
+     * Start asynchronous data receiving
+     *
+     * Initiates asynchronous data handling on the Connection.
+     * {@link onDataReceived} or {@link onError} will be called accordingly
+     *
+     */
+    @Override
+    public void asyncReceive() {
+        super.asyncReceive();
     }
 
     /**

@@ -98,6 +98,11 @@ public abstract class SocketProtocol {
         return buffer;
     }
 
+    /**
+     * Synchronously establish this protocol
+     *
+     * Performs all the necessary handshake until it finishes
+     */
     public ReadResult establish() throws IOException, InterruptedException, ExecutionException {
 
         ReadResult ret;
@@ -125,5 +130,6 @@ public abstract class SocketProtocol {
      *
      * @return Data to be passed over to the client or null if there's no one
      */
-    abstract ReadResult onPacketReceived(ByteBuffer data) throws IOException, InterruptedException, ExecutionException;
+    abstract protected ReadResult onPacketReceived(ByteBuffer data)
+            throws IOException, InterruptedException, ExecutionException;
 }

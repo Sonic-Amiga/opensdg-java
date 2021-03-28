@@ -31,7 +31,8 @@ public class MockTunnel extends EncryptedSocket {
     }
 
     @Override
-    ReadResult onPacketReceived(ByteBuffer data) throws IOException, InterruptedException, ExecutionException {
+    protected ReadResult onPacketReceived(ByteBuffer data)
+            throws IOException, InterruptedException, ExecutionException {
         // TODO Auto-generated method stub
         return null;
     }

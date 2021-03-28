@@ -126,11 +126,15 @@ public class Forward extends SocketProtocol {
         }
     }
 
-    public Forward(Connection conn) {
+    ByteString tunnelId;
+
+    public Forward(ByteString tunnel, Connection conn) {
         super(conn);
+        tunnelId = tunnel;
     }
 
-    public ReadResult establish(ByteString tunnelId) throws IOException, InterruptedException, ExecutionException {
+    @Override
+    public ReadResult establish() throws IOException, InterruptedException, ExecutionException {
         sendPacket(new ForwardRequest(tunnelId));
         return super.establish();
     }
@@ -141,7 +145,8 @@ public class Forward extends SocketProtocol {
     }
 
     @Override
-    ReadResult onPacketReceived(ByteBuffer data) throws IOException, InterruptedException, ExecutionException {
+    protected ReadResult onPacketReceived(ByteBuffer data)
+            throws IOException, InterruptedException, ExecutionException {
         byte cmd = data.get(2);
 
         switch (cmd) {

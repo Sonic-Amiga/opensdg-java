@@ -471,7 +471,8 @@ public class Tunnel extends EncryptedSocket {
     }
 
     @Override
-    ReadResult onPacketReceived(ByteBuffer data) throws IOException, InterruptedException, ExecutionException {
+    protected ReadResult onPacketReceived(ByteBuffer data)
+            throws IOException, InterruptedException, ExecutionException {
         Tunnel.Packet pkt = new Tunnel.Packet(data);
         int cmd = pkt.getCommand();
 

@@ -121,7 +121,7 @@ public class GridConnection extends Connection {
         for (int i = 0; i < servers.length; i++) {
             try {
                 openSocket(randomized[i].host, randomized[i].port);
-                startTunnel();
+                tunnel.establish();
 
                 // Tunnel handshake also includes handling some MESG packets,
                 // the handler will set our state to CONNECTED when done
