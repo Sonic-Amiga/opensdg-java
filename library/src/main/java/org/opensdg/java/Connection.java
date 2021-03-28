@@ -161,12 +161,30 @@ public abstract class Connection {
         s.read(tunnel.getBuffer(), this, readHandler);
     }
 
+    /**
+     * Receive raw data synchronously
+     *
+     * Internal function, do not use!
+     *
+     */
     public int syncReceive(ByteBuffer buffer) throws InterruptedException, ExecutionException {
         return s.read(buffer).get();
     }
 
+    /**
+     * Handle "Protocol ready" packet
+     *
+     * Internal function, do not use!
+     *
+     */
     public abstract void handleReadyPacket() throws IOException, InterruptedException, ExecutionException;
 
+    /**
+     * Handle incoming data packet
+     *
+     * Internal function, do not use!
+     *
+     */
     public abstract void handleDataPacket(InputStream data)
             throws IOException, InterruptedException, ExecutionException;
 
