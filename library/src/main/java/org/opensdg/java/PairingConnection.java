@@ -74,6 +74,14 @@ public class PairingConnection extends PeerConnection {
         return q;
     }
 
+    // This is probably not good, but this is the only easy way to replace
+    // random data for unit test.
+    protected byte[] getSalt() {
+        return InternalUtils.randomBytes(SCALARMULT_BYTES);
+    }
+
+    // Pairing protocol is a challenge-response, designed to verify the OTP
+    // (which both sides know) without actually sending it.
     private ReadResult handlePairingPacket(InputStream data)
             throws IOException, InterruptedException, ExecutionException, GeneralSecurityException {
         int cmd = data.read();
@@ -102,16 +110,18 @@ public class PairingConnection extends PeerConnection {
                 System.arraycopy(challenge.getNonce(), 0, innerHash, SHA512_LENGTH, NONCE_LENGTH);
                 byte[] hash = sha512.digest(innerHash);
 
-                // The following is a pure mathemagic i have completely zero understanding of. :(
+                // challenge.Y is some test message. Probably random. Encrypt it using
+                // the supplied nonce and calculated hash as a key.
                 byte[] xor = new byte[SCALARMULT_BYTES];
                 xsalsa20.crypto_stream_xor(xor, challenge.getY(), SCALARMULT_BYTES, challenge.getNonce(), hash);
 
+                // The following is a pure mathemagic i have completely zero understanding of. :(
                 byte[] base = InternalUtils.crypto_scalarmult_base(tunnel.getBeforeNm());
                 byte[] p1 = crypto_scalarmult(xor, base);
-                byte[] rnd = InternalUtils.randomBytes(SCALARMULT_BYTES);
-                byte[] responseX = crypto_scalarmult(rnd, p1);
+                byte[] salt = getSalt();
+                byte[] responseX = crypto_scalarmult(salt, p1);
 
-                byte[] p2 = crypto_scalarmult(rnd, challenge.getX());
+                byte[] p2 = crypto_scalarmult(salt, challenge.getX());
                 // This is used in both hashing rounds below, avoid copying twice
                 System.arraycopy(p2, 0, innerHash, SHA512_LENGTH, SCALARMULT_BYTES);
 

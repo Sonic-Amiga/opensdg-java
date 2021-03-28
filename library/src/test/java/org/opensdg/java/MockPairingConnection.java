@@ -1,6 +1,7 @@
 package org.opensdg.java;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.opensdg.java.InternalUtils.SCALARMULT_BYTES;
 import static org.opensdg.protocol.Pairing.MSG_PAIRING_RESPONSE;
 
 import java.io.ByteArrayInputStream;
@@ -24,6 +25,17 @@ public class MockPairingConnection extends PairingConnection {
     @Override
     protected void startForwarding(PeerReply reply) {
         // Do nothing here
+    }
+
+    @Override
+    protected byte[] getSalt() {
+        byte[] data = new byte[SCALARMULT_BYTES];
+
+        for (int i = 0; i < SCALARMULT_BYTES; i++) {
+            data[i] = (byte) i;
+        }
+
+        return data;
     }
 
     @Override
