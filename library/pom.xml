@@ -6,8 +6,16 @@
   <groupId>org.opensdg</groupId>
   <artifactId>osdg_java</artifactId>
   <version>1.0</version>
+  <packaging>jar</packaging>
 
-  <name>Open Java implementation of SecureDeviceGrid protocol</name>
+  <name>${project.groupId}:${project.artifactId}</name>
+  <description>Open Java implementation of SecureDeviceGrid protocol</description>
+  
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <manifest-file>${project.build.outputDirectory}/META-INF/MANIFEST.MF</manifest-file>
+  </properties>
+  
   
   <dependencies>
     <dependency>
@@ -31,6 +39,11 @@
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
       <version>3.1.0</version>
+    </dependency>
+    <dependency>
+    <groupId>org.eclipse.jdt</groupId>
+    <artifactId>org.eclipse.jdt.annotation</artifactId>
+    <version>2.2.300</version>
     </dependency>
   </dependencies>
   
@@ -58,9 +71,87 @@
       </plugin>
       <plugin>    
         <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.7.0</version>
         <configuration>
           <source>1.8</source>
           <target>1.8</target>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.0.2</version>
+        <configuration>
+          <archive>
+            <manifestFile>${manifest-file}</manifestFile>
+          </archive>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+        <version>3.5.0</version>
+        <configuration>
+          <manifestPath>${manifest-file}</manifestPath>
+          <bnd><![CDATA[
+Bundle-SymbolicName: ${project.groupId}.${project.artifactId}
+Bundle-Version: ${project.version}
+]]>
+          </bnd>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>bnd-process</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <version>3.0.1</version>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <archive>
+            <manifestFile>${manifest-file}</manifestFile>
+          </archive>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>3.0.0</version>
+        <configuration>
+          <archive>
+            <manifestFile>${manifest-file}</manifestFile>
+          </archive>
+        </configuration>
+        <executions>
+          <execution>
+            <id>attach-javadocs</id>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-release-plugin</artifactId>
+        <version>2.5.3</version>
+        <configuration>
+          <tagNameFormat>v@{project.version}</tagNameFormat>
+          <archive>
+            <manifestFile>${manifest-file}</manifestFile>
+          </archive>
         </configuration>
       </plugin>
     </plugins>
