@@ -1,7 +1,7 @@
 package org.opensdg.java;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.opensdg.java.InternalUtils.SCALARMULT_BYTES;
+import static org.opensdg.internal.Utils.SCALARMULT_BYTES;
 import static org.opensdg.protocol.Pairing.MSG_PAIRING_RESPONSE;
 
 import java.io.ByteArrayInputStream;

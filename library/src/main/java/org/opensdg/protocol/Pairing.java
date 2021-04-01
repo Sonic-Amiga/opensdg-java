@@ -1,6 +1,6 @@
 package org.opensdg.protocol;
 
-import static org.opensdg.java.InternalUtils.SCALARMULT_BYTES;
+import static org.opensdg.internal.Utils.SCALARMULT_BYTES;
 
 import java.io.IOException;
 import java.io.InputStream;

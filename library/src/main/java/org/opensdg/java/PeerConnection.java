@@ -11,7 +11,7 @@ import java.util.concurrent.TimeoutException;
 import javax.xml.bind.DatatypeConverter;
 
 import org.eclipse.jdt.annotation.Nullable;
-import org.opensdg.java.InternalUtils.Hexdump;
+import org.opensdg.internal.Utils.Hexdump;
 import org.opensdg.protocol.Forward;
 import org.opensdg.protocol.generated.ControlProtocol.PeerInfo;
 import org.opensdg.protocol.generated.ControlProtocol.PeerReply;

@@ -1,6 +1,6 @@
 package org.opensdg.java;
 
-import static org.opensdg.java.InternalUtils.SCALARMULT_BYTES;
+import static org.opensdg.internal.Utils.SCALARMULT_BYTES;
 import static org.opensdg.protocol.Pairing.*;
 
 import java.io.IOException;
@@ -12,7 +12,8 @@ import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
-import org.opensdg.java.InternalUtils.Hexdump;
+import org.opensdg.internal.Utils;
+import org.opensdg.internal.Utils.Hexdump;
 import org.opensdg.protocol.Pairing.ChallengePacket;
 import org.opensdg.protocol.Pairing.ResponsePacket;
 import org.opensdg.protocol.Pairing.ResultPacket;
@@ -80,7 +81,7 @@ public class PairingConnection extends PeerConnection {
     // This is probably not good, but this is the only easy way to replace
     // random data for unit test.
     protected byte[] getSalt() {
-        return InternalUtils.randomBytes(SCALARMULT_BYTES);
+        return Utils.randomBytes(SCALARMULT_BYTES);
     }
 
     // Pairing protocol is a challenge-response, designed to verify the OTP
@@ -119,7 +120,7 @@ public class PairingConnection extends PeerConnection {
                 xsalsa20.crypto_stream_xor(xor, challenge.getY(), SCALARMULT_BYTES, challenge.getNonce(), hash);
 
                 // The following is a pure mathemagic i have completely zero understanding of. :(
-                byte[] base = InternalUtils.crypto_scalarmult_base(tunnel.getBeforeNm());
+                byte[] base = Utils.crypto_scalarmult_base(tunnel.getBeforeNm());
                 byte[] p1 = crypto_scalarmult(xor, base);
                 byte[] salt = getSalt();
                 byte[] responseX = crypto_scalarmult(salt, p1);

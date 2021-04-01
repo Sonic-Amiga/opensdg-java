@@ -1,4 +1,4 @@
-package org.opensdg.java;
+package org.opensdg.internal;
 
 import java.security.SecureRandom;
 
@@ -13,7 +13,7 @@ import com.neilalexander.jnacl.crypto.curve25519;
  *
  * @author Pavel Fedin
  */
-public class InternalUtils {
+public class Utils {
     public static byte[] randomBytes(int size) {
         byte[] data = new byte[size];
 
@@ -23,7 +23,7 @@ public class InternalUtils {
 
     public static final int SCALARMULT_BYTES = 32;
 
-    static byte[] crypto_scalarmult_base(byte[] n) {
+    public static byte[] crypto_scalarmult_base(byte[] n) {
         byte[] q = new byte[SCALARMULT_BYTES];
 
         curve25519.crypto_scalarmult_base(q, n);
