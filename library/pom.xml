@@ -96,6 +96,7 @@
           <bnd><![CDATA[
 Bundle-SymbolicName: ${project.groupId}.${project.artifactId}
 Bundle-Version: ${project.version}
+-exportcontents: org.opensdg.java;version="${project.version}"
 ]]>
           </bnd>
         </configuration>
@@ -152,6 +153,23 @@ Bundle-Version: ${project.version}
           <archive>
             <manifestFile>${manifest-file}</manifestFile>
           </archive>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <descriptorRefs>
+            <descriptorRef>jar-with-dependencies</descriptorRef>
+          </descriptorRefs>
         </configuration>
       </plugin>
     </plugins>
