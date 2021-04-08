@@ -1,6 +1,7 @@
 package org.opensdg.java;
 
 import org.opensdg.protocol.MockTunnel;
+import org.opensdg.protocol.generated.ControlProtocol.PeerReply;
 
 public class MockGrid extends GridConnection {
 
@@ -14,8 +15,11 @@ public class MockGrid extends GridConnection {
     @Override
     ForwardRequest pair(String otp) {
         ForwardRequest request = new ForwardRequest(0);
+        PeerReply.Builder reply = PeerReply.newBuilder();
 
-        request.reportDone(null);
+        reply.setId(0);
+        reply.setResult(0);
+        request.reportDone(reply.build());
         return request;
     }
 }
