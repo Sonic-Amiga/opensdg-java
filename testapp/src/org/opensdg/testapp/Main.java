@@ -11,7 +11,6 @@ import java.util.HashMap;
 
 import javax.xml.bind.DatatypeConverter;
 
-import org.opensdg.java.Connection;
 import org.opensdg.java.GridConnection;
 import org.opensdg.java.SDG;
 
@@ -121,15 +120,7 @@ public class Main {
     }
 
     public static void disconnectGrid() {
-        closeConnection(grid);
-    }
-
-    public static void closeConnection(Connection conn) {
-        try {
-            conn.close();
-        } catch (IOException e) {
-            printError("Failed to close the connection", e);
-        }
+        grid.close();
     }
 
     public static void printError(String header, Exception e) {

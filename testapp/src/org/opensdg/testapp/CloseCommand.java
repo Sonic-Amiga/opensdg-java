@@ -27,7 +27,7 @@ public class CloseCommand extends CommandHandler {
             return;
         }
 
-        Main.closeConnection(conn);
+        conn.close();
         Main.peers.remove(num);
     }
 

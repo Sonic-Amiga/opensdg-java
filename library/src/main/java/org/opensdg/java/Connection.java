@@ -107,19 +107,23 @@ public abstract class Connection {
      * connection, it will do nothing. A closed {@link Connection} object can be reused.
      *
      */
-    public void close() throws IOException {
+    public void close() {
+        AsynchronousSocketChannel ch = null;
+
         synchronized (closeLock) {
             if (state != State.CLOSED) {
                 handleClose();
                 setState(State.CLOSED);
-
-                AsynchronousSocketChannel ch = s;
+                ch = s;
                 s = null;
+            }
+        }
 
-                // This can throw, so do it in the last turn
-                if (ch != null) {
-                    ch.close();
-                }
+        if (ch != null) {
+            try {
+                ch.close();
+            } catch (IOException e) {
+                logger.warn("Failed to close AsynchronousSocketChannel: {}", e.toString());
             }
         }
     }
@@ -207,12 +211,7 @@ public abstract class Connection {
             logger.debug("Async channel closed");
         } else {
             onError(exc);
-            try {
-                close();
-            } catch (IOException e) {
-                // In fact this should not happen
-                logger.error("Exception in close(): {}", e);
-            }
+            close();
         }
     }
 
