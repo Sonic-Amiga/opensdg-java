@@ -8,8 +8,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import javax.xml.bind.DatatypeConverter;
-
 import org.eclipse.jdt.annotation.Nullable;
 import org.opensdg.internal.Utils.Hexdump;
 import org.opensdg.protocol.Forward;
@@ -63,8 +61,7 @@ public class PeerConnection extends Connection {
         }
 
         // First ask our grid to make tunnel for us
-        // DatatypeConverter produces upper case, but the Grid wants only lower
-        String peerStr = DatatypeConverter.printHexBinary(peerId).toLowerCase();
+        String peerStr = SDG.bin2hex(peerId);
 
         try {
             PeerReply reply = grid.connectToPeer(peerStr, protocol).get(timeout, TimeUnit.SECONDS);

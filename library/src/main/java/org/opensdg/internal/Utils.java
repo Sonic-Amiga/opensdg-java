@@ -2,7 +2,7 @@ package org.opensdg.internal;
 
 import java.security.SecureRandom;
 
-import javax.xml.bind.DatatypeConverter;
+import org.opensdg.java.SDG;
 
 import com.neilalexander.jnacl.crypto.curve25519;
 
@@ -43,7 +43,7 @@ public class Utils {
 
         @Override
         public String toString() {
-            return DatatypeConverter.printHexBinary(data);
+            return SDG.bin2hex(data);
         }
     }
 }

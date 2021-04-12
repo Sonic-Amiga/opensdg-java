@@ -9,8 +9,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Queue;
 
-import javax.xml.bind.DatatypeConverter;
-
 import org.eclipse.jdt.annotation.Nullable;
 import org.opensdg.protocol.Pairing.ResponsePacket;
 import org.opensdg.protocol.generated.ControlProtocol.PeerReply;
@@ -52,8 +50,8 @@ public class MockPairingConnection extends PairingConnection {
         try {
             ResponsePacket response = new ResponsePacket(input);
 
-            System.out.println("X = " + DatatypeConverter.printHexBinary(response.getX()));
-            System.out.println("Y = " + DatatypeConverter.printHexBinary(response.getY()));
+            System.out.println("X = " + SDG.bin2hex(response.getX()));
+            System.out.println("Y = " + SDG.bin2hex(response.getY()));
         } catch (IOException e) {
             fail("Error parsing ResponsePacket: " + e.toString());
         }
