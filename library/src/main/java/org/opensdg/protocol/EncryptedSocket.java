@@ -34,7 +34,7 @@ public abstract class EncryptedSocket extends SocketProtocol {
      *
      */
     abstract public void sendData(byte[] data)
-            throws ProtocolException, IOException, InterruptedException, ExecutionException, TimeoutException;
+            throws IOException, InterruptedException, ExecutionException, TimeoutException;
 
     /**
      * Get received data

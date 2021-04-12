@@ -2,7 +2,7 @@ package org.opensdg.java;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.ProtocolException;
+import java.nio.channels.ClosedChannelException;
 import java.rmi.RemoteException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -65,9 +65,14 @@ public class PeerConnection extends Connection {
         // First ask our grid to make tunnel for us
         // DatatypeConverter produces upper case, but the Grid wants only lower
         String peerStr = DatatypeConverter.printHexBinary(peerId).toLowerCase();
-        PeerReply reply = grid.connectToPeer(peerStr, protocol).get(timeout, TimeUnit.SECONDS);
 
-        startForwarding(reply);
+        try {
+            PeerReply reply = grid.connectToPeer(peerStr, protocol).get(timeout, TimeUnit.SECONDS);
+            startForwarding(reply);
+        } catch (Exception e) {
+            setState(State.CLOSED);
+            throw e;
+        }
     }
 
     protected void init(GridConnection grid) {
@@ -174,8 +179,10 @@ public class PeerConnection extends Connection {
      * @param data data to send
      * @throws TimeoutException
      */
-    public void sendData(byte[] data)
-            throws ProtocolException, IOException, InterruptedException, ExecutionException, TimeoutException {
+    public void sendData(byte[] data) throws IOException, InterruptedException, ExecutionException, TimeoutException {
+        if (getState() != State.CONNECTED) {
+            throw new ClosedChannelException();
+        }
         tunnel.sendData(data);
     }
 }

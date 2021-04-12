@@ -175,6 +175,7 @@ public class GridConnection extends Connection {
         }
 
         if (lastErr != null) {
+            setState(State.CLOSED);
             throw lastErr;
         }
     }

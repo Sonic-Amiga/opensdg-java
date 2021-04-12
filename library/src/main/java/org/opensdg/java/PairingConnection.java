@@ -41,18 +41,23 @@ public class PairingConnection extends PeerConnection {
         // It looks like the generation algorithm takes care about first digits to be unique
         String otpServerPart = this.otp.substring(0, this.otp.length() - 3);
 
-        PeerReply reply = grid.pair(otpServerPart).get();
-        startForwarding(reply);
+        try {
+            PeerReply reply = grid.pair(otpServerPart).get();
+            startForwarding(reply);
 
-        ReadResult ret = ReadResult.CONTINUE;
+            ReadResult ret = ReadResult.CONTINUE;
 
-        do {
-            InputStream data = receiveData();
+            do {
+                InputStream data = receiveData();
 
-            if (data != null) {
-                ret = handlePairingPacket(data);
-            }
-        } while (ret != ReadResult.DONE);
+                if (data != null) {
+                    ret = handlePairingPacket(data);
+                }
+            } while (ret != ReadResult.DONE);
+        } catch (Exception e) {
+            setState(State.CLOSED);
+            throw e;
+        }
     }
 
     @Override
