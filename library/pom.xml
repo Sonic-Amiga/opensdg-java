@@ -30,19 +30,10 @@
         <version>1.7.0</version>
         <scope>runtime</scope>
     </dependency>
-    <!-- For some reason using this version of the library causes failure
-         to build the Danfoss OpenHAB binding, looks like something is
-         wrong with the pom.xml of the library, so we're using zeromq's fork
-         for now 
     <dependency>
-      <groupId>eu.neilalexander</groupId>
-      <artifactId>jnacl</artifactId>
-      <version>1.0.0</version>
-    </dependency -->
-    <dependency>
-	  <groupId>org.zeromq</groupId>
+	  <groupId>eu.neilalexander</groupId>
 	  <artifactId>jnacl</artifactId>
-	  <version>0.1.0</version>
+	  <version>1.0.0</version>
     </dependency>
     <dependency>
       <groupId>com.google.protobuf</groupId>
