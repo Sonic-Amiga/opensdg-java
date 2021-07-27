@@ -4,6 +4,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.AsynchronousSocketChannel;
@@ -143,7 +144,11 @@ public abstract class Connection {
     public void sendRawData(ByteBuffer data) throws InterruptedException, ExecutionException, TimeoutException {
         int size = data.capacity();
 
-        data.position(0);
+        // Binary incompatibility workaround: In Java 9 position() method has been overridden
+        // in ByteBuffer class; and overridden version returns ByteBuffer. This causes attempt
+        // to call using incompatible signature if compiled with the newer JDK.
+        // We care because we want to run on OpenHAB v2 using Java 1.8
+        ((Buffer) data).position(0);
 
         synchronized (writeLock) {
             while (size > 0) {

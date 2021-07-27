@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ProtocolException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.ExecutionException;
@@ -154,10 +155,18 @@ public class Tunnel extends EncryptedSocket {
             return data.getInt(6);
         }
 
+        protected void setPosition(int pos) {
+            // Binary incompatibility workaround: In Java 9 position() method has been overridden
+            // in ByteBuffer class; and overridden version returns ByteBuffer. This causes attempt
+            // to call using incompatible signature if compiled with the newer JDK.
+            // We care because we want to run on OpenHAB v2 using Java 1.8
+            ((Buffer) data).position(pos);
+        }
+
         protected byte[] getBytes(int start, int size) {
             byte[] ret = new byte[size];
 
-            data.position(start);
+            setPosition(start);
             data.get(ret);
 
             return ret;
@@ -173,11 +182,19 @@ public class Tunnel extends EncryptedSocket {
         private int box_size;
         protected ByteBuffer decrypted;
 
+        protected void setDecryptedPosition(int pos) {
+            // Binary incompatibility workaround: In Java 9 position() method has been overridden
+            // in ByteBuffer class; and overridden version returns ByteBuffer. This causes attempt
+            // to call using incompatible signature if compiled with the newer JDK.
+            // We care because we want to run on OpenHAB v2 using Java 1.8
+            ((Buffer) decrypted).position(pos);
+        }
+
         EncryptedPacket(int raw_portion_size, int encrypted_data_size, int cmd) {
             super(raw_portion_size + INNER_PAD + encrypted_data_size, cmd);
             allocateDecryptedBuffer(encrypted_data_size);
             // Position to the beginning of usable decrypted data area for convenience
-            decrypted.position(OUTER_PAD + INNER_PAD);
+            setDecryptedPosition(OUTER_PAD + INNER_PAD);
         }
 
         EncryptedPacket(Packet pkt, int raw_portion_size, int encrypted_data_size) throws ProtocolException {
@@ -199,7 +216,7 @@ public class Tunnel extends EncryptedSocket {
         protected byte[] getDecryptedBytes(int start, int size) {
             byte[] ret = new byte[size];
 
-            decrypted.position(OUTER_PAD + INNER_PAD + start);
+            setDecryptedPosition(OUTER_PAD + INNER_PAD + start);
             decrypted.get(ret);
 
             return ret;
@@ -220,7 +237,7 @@ public class Tunnel extends EncryptedSocket {
         protected byte[] fillDataToDecrypt(int box_offset) {
             byte[] msg = decrypted.array();
 
-            data.position(HEADER_SIZE + box_offset);
+            setPosition(HEADER_SIZE + box_offset);
             data.get(msg, OUTER_PAD, box_size);
 
             return msg;
