@@ -375,6 +375,7 @@ public class GridConnection extends Connection {
         stopPing();
 
         if (ownScheduler) {
+            pingScheduler = null;
             PingExecutorService.put();
         }
     }
