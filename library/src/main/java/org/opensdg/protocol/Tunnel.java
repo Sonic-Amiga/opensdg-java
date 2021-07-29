@@ -474,6 +474,7 @@ public class Tunnel extends EncryptedSocket {
     private byte[] tempPrivkey;
     private byte[] beforeNm;
     private long nonce;
+    private Object sendLock = new Object();
 
     public Tunnel(Connection conn, byte[] privKey) {
         super(conn);
@@ -562,7 +563,12 @@ public class Tunnel extends EncryptedSocket {
 
     @Override
     public void sendData(byte[] data) throws IOException, InterruptedException, ExecutionException, TimeoutException {
-        sendPacket(new MESGPacket(getNextNonce(), beforeNm, data));
+        // We can be called by arbitrary number of threads, but we need to make sure
+        // that packets are sent in the order of their nonces. Our remote peer simply
+        // hangs up if we fail to do so
+        synchronized (sendLock) {
+            sendPacket(new MESGPacket(getNextNonce(), beforeNm, data));
+        }
     }
 
     @Override
