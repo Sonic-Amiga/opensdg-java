@@ -506,7 +506,7 @@ public class Tunnel extends EncryptedSocket {
             logger.trace("Created short-term public key: {}", new Hexdump(tempPubkey));
             logger.trace("Created short-term secret key: {}", new Hexdump(tempPrivkey));
 
-            sendPacket(new HELOPacket(serverPubkey, tempPubkey, tempPrivkey, getNonce()));
+            sendPacket(new HELOPacket(serverPubkey, tempPubkey, tempPrivkey, getNextNonce()));
         } else if (cmd == CMD_COOK) {
             COOKPacket cook = new COOKPacket(pkt, serverPubkey, tempPrivkey);
             byte[] tempServerPubkey = cook.getShortTermPubkey();
@@ -518,7 +518,7 @@ public class Tunnel extends EncryptedSocket {
             beforeNm = new byte[curve25519xsalsa20poly1305.crypto_secretbox_BEFORENMBYTES];
             curve25519xsalsa20poly1305.crypto_box_beforenm(beforeNm, tempServerPubkey, tempPrivkey);
 
-            sendPacket(new VOCHPacket(serverCookie, getNonce(), beforeNm, serverPubkey, clientPrivkey, clientPubkey,
+            sendPacket(new VOCHPacket(serverCookie, getNextNonce(), beforeNm, serverPubkey, clientPrivkey, clientPubkey,
                     tempPubkey, null));
         } else if (cmd == CMD_REDY) {
             handleREDY(new REDYPacket(pkt, beforeNm));
@@ -546,7 +546,7 @@ public class Tunnel extends EncryptedSocket {
         connection.sendRawData(pkt.getData());
     }
 
-    private long getNonce() {
+    private long getNextNonce() {
         return nonce++;
     }
 
@@ -562,7 +562,7 @@ public class Tunnel extends EncryptedSocket {
 
     @Override
     public void sendData(byte[] data) throws IOException, InterruptedException, ExecutionException, TimeoutException {
-        sendPacket(new MESGPacket(getNonce(), beforeNm, data));
+        sendPacket(new MESGPacket(getNextNonce(), beforeNm, data));
     }
 
     @Override
