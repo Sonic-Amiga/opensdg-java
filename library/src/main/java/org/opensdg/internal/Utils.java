@@ -14,10 +14,12 @@ import com.neilalexander.jnacl.crypto.curve25519;
  * @author Pavel Fedin
  */
 public class Utils {
+    static SecureRandom rnd = new SecureRandom();
+
     public static byte[] randomBytes(int size) {
         byte[] data = new byte[size];
 
-        new SecureRandom().nextBytes(data);
+        rnd.nextBytes(data);
         return data;
     }
 
