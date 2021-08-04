@@ -24,14 +24,19 @@ public abstract class EncryptedSocket extends SocketProtocol {
     /**
      * Make another EncryptedSocket, inheriting credentials from this one
      *
+     * @param conn a {@link Connection} to service
+     * @return a new EncryptedSocket instance
      */
     abstract public EncryptedSocket makePeerTunnel(Connection conn);
 
     /**
      * Send data over the encrypted channel
      *
-     * @throws TimeoutException
-     *
+     * @param data Data to send
+     * @throws IOException if protocol fails
+     * @throws ExecutionException if the underlying I/O threw an exception
+     * @throws InterruptedException if the current thread was interrupted
+     * @throws TimeoutException if the operation has timed out
      */
     abstract public void sendData(byte[] data)
             throws IOException, InterruptedException, ExecutionException, TimeoutException;
@@ -39,6 +44,8 @@ public abstract class EncryptedSocket extends SocketProtocol {
     /**
      * Get received data
      *
+     * @return Decrypted received data
+     * @throws ProtocolException if data decryption fails
      */
     abstract public InputStream getData() throws ProtocolException;
 

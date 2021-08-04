@@ -142,8 +142,12 @@ public abstract class Connection {
      * Synchronously send a raw data buffer
      *
      * Keeps writing synchronously until the full packet has been written
+     * This is an internal function, not for public use!
      *
-     * @throws TimeoutException
+     * @param data the data to send
+     * @throws ExecutionException if the underlying write operation threw an exception
+     * @throws InterruptedException if the current thread was interrupted
+     * @throws TimeoutException if the operation has timed out
      *
      */
     public void sendRawData(ByteBuffer data) throws InterruptedException, ExecutionException, TimeoutException {
@@ -177,10 +181,13 @@ public abstract class Connection {
     /**
      * Receive raw data synchronously
      *
-     * Internal function, do not use!
+     * This is an internal function, not for public use!
      *
-     * @throws TimeoutException
-     *
+     * @param buffer {@link ByteBuffer} to put the data to
+     * @return Number of bytes read
+     * @throws ExecutionException if the underlying write operation threw an exception
+     * @throws InterruptedException if the current thread was interrupted
+     * @throws TimeoutException if the operation has timed out
      */
     public int syncReceive(ByteBuffer buffer) throws InterruptedException, ExecutionException, TimeoutException {
         return s.read(buffer).get(timeout, TimeUnit.SECONDS);
@@ -189,10 +196,12 @@ public abstract class Connection {
     /**
      * Handle "Protocol ready" packet
      *
-     * Internal function, do not use!
+     * This is an internal function, not for public use!
      *
-     * @throws TimeoutException
-     *
+     * @throws IOException if packet decoding fails
+     * @throws ExecutionException if the response write operation threw an exception
+     * @throws InterruptedException if the current thread was interrupted
+     * @throws TimeoutException if the operation has timed out
      */
     public abstract void handleReadyPacket()
             throws IOException, InterruptedException, ExecutionException, TimeoutException;
@@ -202,8 +211,11 @@ public abstract class Connection {
      *
      * Internal function, do not use!
      *
-     * @throws TimeoutException
-     *
+     * @param data InputStream, containing the received data
+     * @throws IOException if packet decoding fails
+     * @throws ExecutionException if the response write operation threw an exception
+     * @throws InterruptedException if the current thread was interrupted
+     * @throws TimeoutException if the operation has timed out
      */
     public abstract void handleDataPacket(InputStream data)
             throws IOException, InterruptedException, ExecutionException, TimeoutException;
@@ -213,6 +225,7 @@ public abstract class Connection {
      * E. g. failed to respond to a packet. It takes care about internal normal events,
      * like asynchronous close.
      *
+     * @param exc Error description
      */
     protected void handleError(Throwable exc) {
         if (exc instanceof AsynchronousCloseException) {
@@ -284,7 +297,7 @@ public abstract class Connection {
      * Sets timeout for various socket operations, like connecting, sending,
      * receiving, etc; in seconds. Default value is 10.
      *
-     * @return peer ID
+     * @param seconds timeout value in seconds
      */
     public void setTimeout(int seconds) {
         timeout = seconds;

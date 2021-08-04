@@ -34,7 +34,10 @@ public class PeerConnection extends Connection {
      * @param grid master connection to use
      * @param peerId ID (AKA public key) of the peer to call
      * @param protocol application-specific protocol ID
-     * @throws TimeoutException
+     * @throws IOException if protocol fails
+     * @throws ExecutionException if I/O fails
+     * @throws InterruptedException if the current thread was interrupted
+     * @throws TimeoutException if the operation has timed out
      */
     public void connectToRemote(GridConnection grid, byte[] peerId, String protocol)
             throws IOException, InterruptedException, ExecutionException, TimeoutException {
@@ -157,7 +160,10 @@ public class PeerConnection extends Connection {
      * Receive a single data packet synchronously
      *
      * @return data received or null on EOF
-     * @throws TimeoutException
+     * @throws IOException if packet decoding fails
+     * @throws ExecutionException if the response write operation threw an exception
+     * @throws InterruptedException if the current thread was interrupted
+     * @throws TimeoutException if the operation has timed out
      */
     public @Nullable InputStream receiveData()
             throws IOException, InterruptedException, ExecutionException, TimeoutException {
@@ -174,7 +180,10 @@ public class PeerConnection extends Connection {
      * Send a single data packet synchronously
      *
      * @param data data to send
-     * @throws TimeoutException
+     * @throws IOException if packet encoding fails
+     * @throws ExecutionException if the response write operation threw an exception
+     * @throws InterruptedException if the current thread was interrupted
+     * @throws TimeoutException if the operation has timed out
      */
     public void sendData(byte[] data) throws IOException, InterruptedException, ExecutionException, TimeoutException {
         if (getState() != State.CONNECTED) {

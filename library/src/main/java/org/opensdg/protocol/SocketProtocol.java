@@ -33,8 +33,11 @@ public abstract class SocketProtocol {
      * Keeps reading synchronously until the full packet has been read
      * or EOF reached
      *
-     * @throws TimeoutException
-     *
+     * @return Result code
+     * @throws IOException if packet decoding fails
+     * @throws ExecutionException if the underlying I/O threw an exception
+     * @throws InterruptedException if the current thread was interrupted
+     * @throws TimeoutException if the operation has timed out
      */
     public ReadResult receiveRawPacket()
             throws IOException, InterruptedException, ExecutionException, TimeoutException {
@@ -55,8 +58,9 @@ public abstract class SocketProtocol {
      * Advances current read buffer pointer, performing reallocation when needed
      *
      * @param size Number of bytes received
+     * @return Result code
      */
-    public ReadResult onRawDataReceived(int size) throws IOException, InterruptedException, ExecutionException {
+    public ReadResult onRawDataReceived(int size) {
         if (size == -1) {
             return ReadResult.EOF;
         }
@@ -107,7 +111,11 @@ public abstract class SocketProtocol {
      *
      * Performs all the necessary handshake until it finishes
      *
-     * @throws TimeoutException
+     * @return Result code
+     * @throws IOException if protocol fails
+     * @throws ExecutionException if the underlying I/O threw an exception
+     * @throws InterruptedException if the current thread was interrupted
+     * @throws TimeoutException if the operation has timed out
      */
     public ReadResult establish() throws IOException, InterruptedException, ExecutionException, TimeoutException {
 
@@ -135,8 +143,12 @@ public abstract class SocketProtocol {
      * Inteprprets packet's contents and replies when needed.
      * For MESG packet payload will be retrieved and returned.
      *
+     * @param data Received raw data
      * @return Data to be passed over to the client or null if there's no one
-     * @throws TimeoutException
+     * @throws IOException if packet deconfing fails
+     * @throws ExecutionException if the response write threw an exception
+     * @throws InterruptedException if the current thread was interrupted
+     * @throws TimeoutException if the operation has timed out
      */
     abstract protected ReadResult onPacketReceived(ByteBuffer data)
             throws IOException, InterruptedException, ExecutionException, TimeoutException;

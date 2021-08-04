@@ -117,7 +117,10 @@ public class GridConnection extends Connection {
      * all of them.
      *
      * @param servers array of endpoint specifiers.
-     * @throws TimeoutException
+     * @throws IOException if packet decoding fails
+     * @throws ExecutionException if an I/O threw an exception
+     * @throws InterruptedException if the current thread was interrupted
+     * @throws TimeoutException if the operation has timed out
      */
     public void connect(@NonNull Endpoint[] servers)
             throws IOException, InterruptedException, ExecutionException, TimeoutException {

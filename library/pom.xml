@@ -138,7 +138,7 @@ Bundle-Version: ${project.version}
           </archive>
         </configuration>
       </plugin>
-      <!-- plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
         <version>3.0.0</version>
@@ -155,7 +155,7 @@ Bundle-Version: ${project.version}
             </goals>
           </execution>
         </executions>
-      </plugin-->
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-release-plugin</artifactId>
