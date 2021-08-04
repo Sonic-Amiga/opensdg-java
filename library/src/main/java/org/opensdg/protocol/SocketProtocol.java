@@ -6,7 +6,6 @@ import java.nio.ByteOrder;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
-import org.opensdg.java.Connection;
 import org.opensdg.java.Connection.ReadResult;
 
 /**
@@ -17,13 +16,13 @@ import org.opensdg.java.Connection.ReadResult;
  * @author Pavel Fedin
  */
 public abstract class SocketProtocol {
-    protected Connection connection;
+    protected IConnection connection;
 
     private ByteBuffer receiveBuffer = null;
     private short bytesLeft = 0;
     private int bytesReceived = 0;
 
-    public SocketProtocol(Connection conn) {
+    public SocketProtocol(IConnection conn) {
         connection = conn;
     }
 

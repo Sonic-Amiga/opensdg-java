@@ -2,7 +2,6 @@ package org.opensdg.java;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
@@ -17,6 +16,7 @@ import java.util.concurrent.TimeoutException;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 import org.opensdg.protocol.EncryptedSocket;
+import org.opensdg.protocol.IConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Pavel Fedin
  */
-public abstract class Connection {
+public abstract class Connection extends IConnection {
     private final Logger logger = LoggerFactory.getLogger(Connection.class);
 
     private static class ReadHandler implements CompletionHandler<Integer, Connection> {
@@ -138,19 +138,8 @@ public abstract class Connection {
 
     }
 
-    /**
-     * Synchronously send a raw data buffer
-     *
-     * Keeps writing synchronously until the full packet has been written
-     * This is an internal function, not for public use!
-     *
-     * @param data the data to send
-     * @throws ExecutionException if the underlying write operation threw an exception
-     * @throws InterruptedException if the current thread was interrupted
-     * @throws TimeoutException if the operation has timed out
-     *
-     */
-    public void sendRawData(ByteBuffer data) throws InterruptedException, ExecutionException, TimeoutException {
+    @Override
+    protected void doSendRawData(ByteBuffer data) throws InterruptedException, ExecutionException, TimeoutException {
         int size = data.capacity();
 
         // Binary incompatibility workaround: In Java 9 position() method has been overridden
@@ -178,47 +167,10 @@ public abstract class Connection {
         s.read(tunnel.getBuffer(), this, readHandler);
     }
 
-    /**
-     * Receive raw data synchronously
-     *
-     * This is an internal function, not for public use!
-     *
-     * @param buffer {@link ByteBuffer} to put the data to
-     * @return Number of bytes read
-     * @throws ExecutionException if the underlying write operation threw an exception
-     * @throws InterruptedException if the current thread was interrupted
-     * @throws TimeoutException if the operation has timed out
-     */
-    public int syncReceive(ByteBuffer buffer) throws InterruptedException, ExecutionException, TimeoutException {
+    @Override
+    protected int doSyncReceive(ByteBuffer buffer) throws InterruptedException, ExecutionException, TimeoutException {
         return s.read(buffer).get(timeout, TimeUnit.SECONDS);
     }
-
-    /**
-     * Handle "Protocol ready" packet
-     *
-     * This is an internal function, not for public use!
-     *
-     * @throws IOException if packet decoding fails
-     * @throws ExecutionException if the response write operation threw an exception
-     * @throws InterruptedException if the current thread was interrupted
-     * @throws TimeoutException if the operation has timed out
-     */
-    public abstract void handleReadyPacket()
-            throws IOException, InterruptedException, ExecutionException, TimeoutException;
-
-    /**
-     * Handle incoming data packet
-     *
-     * Internal function, do not use!
-     *
-     * @param data InputStream, containing the received data
-     * @throws IOException if packet decoding fails
-     * @throws ExecutionException if the response write operation threw an exception
-     * @throws InterruptedException if the current thread was interrupted
-     * @throws TimeoutException if the operation has timed out
-     */
-    public abstract void handleDataPacket(InputStream data)
-            throws IOException, InterruptedException, ExecutionException, TimeoutException;
 
     /**
      * This function is called if internal processing fails.

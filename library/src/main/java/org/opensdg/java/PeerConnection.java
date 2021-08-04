@@ -105,12 +105,12 @@ public class PeerConnection extends Connection {
     }
 
     @Override
-    public void handleReadyPacket() throws IOException, InterruptedException, ExecutionException {
+    public void onReadyPacket() throws IOException, InterruptedException, ExecutionException {
         setState(State.CONNECTED);
     }
 
     @Override
-    public void handleDataPacket(InputStream data) throws IOException, InterruptedException, ExecutionException {
+    public void onDataPacket(InputStream data) throws IOException, InterruptedException, ExecutionException {
         // Pass the data over to the client
         onDataReceived(handleProtocolBugs(data));
     }

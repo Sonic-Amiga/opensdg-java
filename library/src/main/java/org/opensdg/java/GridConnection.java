@@ -184,7 +184,7 @@ public class GridConnection extends Connection {
     }
 
     @Override
-    public void handleReadyPacket() throws IOException, InterruptedException, ExecutionException, TimeoutException {
+    protected void onReadyPacket() throws IOException, InterruptedException, ExecutionException, TimeoutException {
         // At this point the grid seems to be ready and subsequent steps are
         // probably optional. But let's do them just in case, to be as close
         // to original implementation as possible.
@@ -199,7 +199,7 @@ public class GridConnection extends Connection {
     }
 
     @Override
-    public void handleDataPacket(InputStream data)
+    protected void onDataPacket(InputStream data)
             throws IOException, InterruptedException, ExecutionException, TimeoutException {
         int msgType = data.read();
 
