@@ -8,7 +8,7 @@ import java.util.concurrent.TimeoutException;
 
 /**
  * This class is a glue, whose only purpose is to provide ability to call
- * certain methods of public {@link Connection} class from within "protocol"
+ * certain methods of public Connection class from within "protocol"
  * package without making them public
  *
  * @author Pavel Fedin
