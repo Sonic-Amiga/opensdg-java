@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousChannelGroup;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.channels.CompletionHandler;
@@ -87,6 +88,7 @@ public abstract class Connection {
     private State state = State.CLOSED;
     protected int timeout = 10;
 
+    private AsynchronousChannelGroup group;
     private AsynchronousSocketChannel s;
     protected EncryptedSocket tunnel;
     private Object writeLock = new Object();
@@ -96,7 +98,8 @@ public abstract class Connection {
 
     protected void openSocket(String host, int port)
             throws IOException, InterruptedException, ExecutionException, TimeoutException {
-        s = AsynchronousSocketChannel.open();
+        group = ChannelGroupHolder.get();
+        s = AsynchronousSocketChannel.open(group);
         s.connect(new InetSocketAddress(host, port)).get(timeout, TimeUnit.SECONDS);
         logger.debug("Connected to {}:{}", host, port);
     }
@@ -117,6 +120,7 @@ public abstract class Connection {
                 setState(State.CLOSED);
                 ch = s;
                 s = null;
+                group = null;
             }
         }
 
@@ -126,6 +130,7 @@ public abstract class Connection {
             } catch (IOException e) {
                 logger.warn("Failed to close AsynchronousSocketChannel: {}", e.toString());
             }
+            ChannelGroupHolder.put();
         }
     }
 

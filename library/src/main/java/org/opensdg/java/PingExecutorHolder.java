@@ -10,14 +10,13 @@ import java.util.concurrent.ScheduledExecutorService;
  *
  * @author Pavel Fedin
  */
-class PingExecutorService {
-
+class PingExecutorHolder {
     private static ScheduledExecutorService scheduler = null;
     private static int useCount = 0;
 
     synchronized public static ScheduledExecutorService get() {
         if (useCount == 0) {
-            scheduler = Executors.newScheduledThreadPool(1);
+            scheduler = Executors.newScheduledThreadPool(1, new NamedThreadFactory("SDG ping thread"));
         }
         useCount++;
 
@@ -30,5 +29,4 @@ class PingExecutorService {
             scheduler = null;
         }
     }
-
 }

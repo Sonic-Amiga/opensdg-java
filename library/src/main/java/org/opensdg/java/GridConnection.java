@@ -142,7 +142,7 @@ public class GridConnection extends Connection {
         pingDelay = -1;
 
         if (ownScheduler) {
-            pingScheduler = PingExecutorService.get();
+            pingScheduler = PingExecutorHolder.get();
         }
 
         for (int i = 0; i < servers.length; i++) {
@@ -376,7 +376,7 @@ public class GridConnection extends Connection {
 
         if (ownScheduler) {
             pingScheduler = null;
-            PingExecutorService.put();
+            PingExecutorHolder.put();
         }
     }
 
