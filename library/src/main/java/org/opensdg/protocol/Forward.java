@@ -61,14 +61,6 @@ public class Forward extends SocketProtocol {
             return data;
         }
 
-        public int getPayloadLength() {
-            return data.getShort(2) - 1;
-        }
-
-        public byte getCommand() {
-            return data.get(2);
-        }
-
         public InputStream getPayload() {
             data.position(3);
             return new ByteBufferInputStream(data);
