@@ -101,7 +101,8 @@ public class Tunnel extends EncryptedSocket {
         protected Packet(int data_size, int cmd) {
             int size = HEADER_SIZE + data_size;
 
-            data = ByteBuffer.allocate(size).order(ByteOrder.BIG_ENDIAN);
+            // Direct ByteBuffers are more optimal for I/O
+            data = ByteBuffer.allocateDirect(size).order(ByteOrder.BIG_ENDIAN);
 
             // 0 - Packet size, excluding this field
             data.putShort((short) (size - 2));

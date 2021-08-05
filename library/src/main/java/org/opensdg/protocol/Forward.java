@@ -2,8 +2,6 @@ package org.opensdg.protocol;
 
 import static org.opensdg.protocol.Control.*;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ProtocolException;
@@ -46,13 +44,13 @@ public class Forward extends SocketProtocol {
 
         Packet(byte cmd, AbstractMessage msg) throws IOException {
             int msgSize = 1 + msg.getSerializedSize();
-            ByteArrayOutputStream out = new ByteArrayOutputStream(2 + msgSize);
 
-            out.write(msgSize >> 8);
-            out.write(msgSize);
-            out.write(cmd);
-            msg.writeTo(out);
-            data = ByteBuffer.wrap(out.toByteArray()).order(ByteOrder.BIG_ENDIAN);
+            // Direct buffers are more optimal for I/O
+            data = ByteBuffer.allocateDirect(2 + msgSize).order(ByteOrder.BIG_ENDIAN);
+            data.putShort((short) msgSize);
+            data.put(cmd);
+
+            msg.writeTo(new ByteBufferOutputStream(data));
         }
 
         Packet(ByteBuffer buffer) {
@@ -72,7 +70,8 @@ public class Forward extends SocketProtocol {
         }
 
         public InputStream getPayload() {
-            return new ByteArrayInputStream(data.array(), 3, getPayloadLength());
+            data.position(3);
+            return new ByteBufferInputStream(data);
         }
 
     }

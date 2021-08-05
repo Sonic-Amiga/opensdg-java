@@ -77,7 +77,7 @@ public abstract class SocketProtocol {
             bytesLeft = receiveBuffer.getShort(0);
 
             // Reallocate our buffer with the new size
-            receiveBuffer = ByteBuffer.allocate(2 + bytesLeft);
+            receiveBuffer = ByteBuffer.allocateDirect(2 + bytesLeft);
             receiveBuffer.putShort(bytesLeft);
 
             return ReadResult.CONTINUE;
@@ -90,7 +90,7 @@ public abstract class SocketProtocol {
         if (receiveBuffer == null) {
             // Start receiving a new packet.
             // Every packet is prefixed with length, read it first
-            receiveBuffer = ByteBuffer.allocate(2);
+            receiveBuffer = ByteBuffer.allocateDirect(2);
             bytesReceived = 0;
             bytesLeft = 2;
         }
