@@ -14,7 +14,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.opensdg.protocol.Control;
-import org.opensdg.protocol.Tunnel;
+import org.opensdg.protocol.MDGBinary;
 import org.opensdg.protocol.generated.ControlProtocol.ConnectToPeer;
 import org.opensdg.protocol.generated.ControlProtocol.PairRemote;
 import org.opensdg.protocol.generated.ControlProtocol.PeerReply;
@@ -86,7 +86,7 @@ public class GridConnection extends Connection {
      * @param key a private key to use
      */
     public GridConnection(byte[] key) {
-        tunnel = new Tunnel(this, key);
+        tunnel = new MDGBinary(this, key);
         ownScheduler = true;
     }
 
@@ -105,7 +105,7 @@ public class GridConnection extends Connection {
      * @param scheduler a ScheduledExecutorService
      */
     public GridConnection(byte[] key, ScheduledExecutorService scheduler) {
-        tunnel = new Tunnel(this, key);
+        tunnel = new MDGBinary(this, key);
         pingScheduler = scheduler;
         ownScheduler = false;
     }

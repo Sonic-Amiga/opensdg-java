@@ -10,7 +10,7 @@ import org.opensdg.java.Connection;
 import org.opensdg.java.Connection.ReadResult;
 import org.opensdg.java.SDG;
 
-public class MockTunnel extends EncryptedSocket {
+public class MockTunnel extends EncryptedProtocol {
 
     byte[] clientPubkey;
 

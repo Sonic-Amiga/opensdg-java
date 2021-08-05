@@ -15,14 +15,14 @@ import org.opensdg.java.Connection.ReadResult;
  *
  * @author Pavel Fedin
  */
-public abstract class SocketProtocol {
+public abstract class RawProtocol {
     protected IConnection connection;
 
     private ByteBuffer receiveBuffer = null;
     private short bytesLeft = 0;
     private int bytesReceived = 0;
 
-    public SocketProtocol(IConnection conn) {
+    public RawProtocol(IConnection conn) {
         connection = conn;
     }
 

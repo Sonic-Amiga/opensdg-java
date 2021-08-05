@@ -15,9 +15,9 @@ import org.opensdg.java.Connection;
  *
  * @author Pavel Fedin
  */
-public abstract class EncryptedSocket extends SocketProtocol {
+public abstract class EncryptedProtocol extends RawProtocol {
 
-    public EncryptedSocket(Connection conn) {
+    public EncryptedProtocol(Connection conn) {
         super(conn);
     }
 
@@ -27,7 +27,7 @@ public abstract class EncryptedSocket extends SocketProtocol {
      * @param conn a {@link Connection} to service
      * @return a new EncryptedSocket instance
      */
-    abstract public EncryptedSocket makePeerTunnel(Connection conn);
+    abstract public EncryptedProtocol makePeerTunnel(Connection conn);
 
     /**
      * Send data over the encrypted channel

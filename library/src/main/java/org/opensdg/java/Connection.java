@@ -15,7 +15,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
-import org.opensdg.protocol.EncryptedSocket;
+import org.opensdg.protocol.EncryptedProtocol;
 import org.opensdg.protocol.IConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,7 +90,7 @@ public abstract class Connection extends IConnection {
 
     private AsynchronousChannelGroup group;
     private AsynchronousSocketChannel s;
-    protected EncryptedSocket tunnel;
+    protected EncryptedProtocol tunnel;
     private Object writeLock = new Object();
     private Object closeLock = new Object();
 

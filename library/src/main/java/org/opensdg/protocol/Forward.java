@@ -28,7 +28,7 @@ import com.google.protobuf.ByteString;
  *
  * @author Pavel Fedin
  */
-public class Forward extends SocketProtocol {
+public class Forward extends RawProtocol {
     private final Logger logger = LoggerFactory.getLogger(Forward.class);
 
     private static final byte MSG_FORWARD_REQUEST = 0;

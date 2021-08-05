@@ -28,8 +28,8 @@ import com.neilalexander.jnacl.crypto.curve25519xsalsa20poly1305;
  *
  * @author Pavel Fedin
  */
-public class Tunnel extends EncryptedSocket {
-    private final Logger logger = LoggerFactory.getLogger(Tunnel.class);
+public class MDGBinary extends EncryptedProtocol {
+    private final Logger logger = LoggerFactory.getLogger(MDGBinary.class);
 
     private static int CMD(int a, int b, int c, int d) {
         return (a << 24) | (b << 16) | (c << 8) | d;
@@ -477,15 +477,15 @@ public class Tunnel extends EncryptedSocket {
     private long nonce;
     private Object sendLock = new Object();
 
-    public Tunnel(Connection conn, byte[] privKey) {
+    public MDGBinary(Connection conn, byte[] privKey) {
         super(conn);
         clientPrivkey = privKey.clone();
         clientPubkey = SDG.calcPublicKey(clientPrivkey);
     }
 
     @Override
-    public Tunnel makePeerTunnel(Connection conn) {
-        Tunnel peer = new Tunnel(conn, clientPrivkey);
+    public MDGBinary makePeerTunnel(Connection conn) {
+        MDGBinary peer = new MDGBinary(conn, clientPrivkey);
         peer.clientPubkey = clientPubkey;
         return peer;
     }
@@ -493,7 +493,7 @@ public class Tunnel extends EncryptedSocket {
     @Override
     protected ReadResult onPacketReceived(ByteBuffer data)
             throws IOException, InterruptedException, ExecutionException, TimeoutException {
-        Tunnel.Packet pkt = new Tunnel.Packet(data);
+        MDGBinary.Packet pkt = new MDGBinary.Packet(data);
         int cmd = pkt.getCommand();
 
         logger.trace("Received packet: {}", pkt);
@@ -543,7 +543,7 @@ public class Tunnel extends EncryptedSocket {
         connection.handleReadyPacket();
     }
 
-    private void sendPacket(Tunnel.Packet pkt) throws InterruptedException, ExecutionException, TimeoutException {
+    private void sendPacket(MDGBinary.Packet pkt) throws InterruptedException, ExecutionException, TimeoutException {
         logger.trace("Sending packet: {}", pkt);
         connection.sendRawData(pkt.getData());
     }
