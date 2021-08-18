@@ -137,7 +137,7 @@ public class GridConnection extends Connection {
             list[idx] = list[left];
         }
 
-        IOException lastErr = null;
+        Exception lastErr = null;
 
         checkState(State.CLOSED);
         setState(State.CONNECTING);
@@ -171,7 +171,7 @@ public class GridConnection extends Connection {
                 asyncReceive();
 
                 return;
-            } catch (IOException e) {
+            } catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
                 logger.debug("Failed to connect to {}:{}: {}", randomized[i].host, randomized[i].port, e.getMessage());
                 lastErr = e;
             }
@@ -179,7 +179,20 @@ public class GridConnection extends Connection {
 
         if (lastErr != null) {
             setState(State.CLOSED);
-            throw lastErr;
+
+            // Java sucks; we have to write these checks or to declare throwing an Exception,
+            // which we really don't want to
+            if (lastErr instanceof IOException) {
+                throw (IOException) lastErr;
+            } else if (lastErr instanceof InterruptedException) {
+                throw (InterruptedException) lastErr;
+            } else if (lastErr instanceof ExecutionException) {
+                throw (ExecutionException) lastErr;
+            } else if (lastErr instanceof TimeoutException) {
+                throw (TimeoutException) lastErr;
+            } else {
+                throw new IOException(lastErr.getMessage(), lastErr);
+            }
         }
     }
 
