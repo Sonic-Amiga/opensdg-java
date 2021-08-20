@@ -99,7 +99,9 @@ public abstract class Connection extends IConnection {
 
     protected void openSocket(String host, int port)
             throws IOException, InterruptedException, ExecutionException, TimeoutException {
-        group = ChannelGroupHolder.get();
+        if (group == null) {
+            group = ChannelGroupHolder.get();
+        }
         socket = AsynchronousSocketChannel.open(group);
         socket.connect(new InetSocketAddress(host, port)).get(timeout, TimeUnit.SECONDS);
         logger.debug("Connected to {}:{}", host, port);
@@ -110,7 +112,6 @@ public abstract class Connection extends IConnection {
      *
      * For convenience it's allowed to call close() on an already closed
      * connection, it will do nothing. A closed {@link Connection} object can be reused.
-     *
      */
     public void close() {
         AsynchronousSocketChannel ch = null;
@@ -126,12 +127,22 @@ public abstract class Connection extends IConnection {
         }
 
         if (ch != null) {
-            try {
-                ch.close();
-            } catch (IOException e) {
-                logger.warn("Failed to close AsynchronousSocketChannel: {}", e.toString());
-            }
+            safeClose(ch);
             ChannelGroupHolder.put();
+        }
+    }
+
+    protected void closeOnlySocket() {
+        safeClose(socket);
+        socket = null;
+    }
+
+    protected void safeClose(AsynchronousSocketChannel ch) {
+        try {
+            ch.close();
+        } catch (IOException e) {
+            // Would be very strange to get this, but Java forces us to do something
+            logger.warn("Failed to close AsynchronousSocketChannel: {}", e.toString());
         }
     }
 

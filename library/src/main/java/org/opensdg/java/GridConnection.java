@@ -180,25 +180,29 @@ public class GridConnection extends Connection {
                 close();
                 throw e;
             }
+
+            // Close the socket channel but keep the rest (group etc)
+            closeOnlySocket();
         }
 
-        if (lastErr != null) {
-            // We must be ready for reuse, free resources
-            close();
+        // If we're here, we failed to connect to any server.
+        // We must be ready for reuse, free resources
+        close();
 
-            // Java sucks; we have to write these checks or to declare throwing an Exception,
-            // which we really don't want to
-            if (lastErr instanceof IOException) {
-                throw (IOException) lastErr;
-            } else if (lastErr instanceof InterruptedException) {
-                throw (InterruptedException) lastErr;
-            } else if (lastErr instanceof ExecutionException) {
-                throw (ExecutionException) lastErr;
-            } else if (lastErr instanceof TimeoutException) {
-                throw (TimeoutException) lastErr;
-            } else {
-                throw new IllegalStateException("Unexpected exception: " + lastErr.toString());
-            }
+        // Java sucks; we have to write these checks or to declare throwing an Exception,
+        // which we really don't want to
+        if (lastErr == null) {
+            throw new IllegalArgumentException("Empty server list given");
+        } else if (lastErr instanceof IOException) {
+            throw (IOException) lastErr;
+        } else if (lastErr instanceof InterruptedException) {
+            throw (InterruptedException) lastErr;
+        } else if (lastErr instanceof ExecutionException) {
+            throw (ExecutionException) lastErr;
+        } else if (lastErr instanceof TimeoutException) {
+            throw (TimeoutException) lastErr;
+        } else {
+            throw new IllegalStateException("Unexpected exception: " + lastErr.toString());
         }
     }
 
