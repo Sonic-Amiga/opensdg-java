@@ -115,12 +115,14 @@ public abstract class Connection extends IConnection {
      */
     public void close() {
         AsynchronousSocketChannel ch = null;
+        AsynchronousChannelGroup grp = null;
 
         synchronized (closeLock) {
             if (state != State.CLOSED) {
                 handleClose();
                 setState(State.CLOSED);
                 ch = socket;
+                grp = group;
                 socket = null;
                 group = null;
             }
@@ -128,6 +130,8 @@ public abstract class Connection extends IConnection {
 
         if (ch != null) {
             safeClose(ch);
+        }
+        if (grp != null) {
             ChannelGroupHolder.put();
         }
     }
