@@ -1,5 +1,6 @@
 package org.opensdg.java;
 
+import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -68,6 +69,10 @@ class ForwardRequest implements Future<PeerReply> {
         }
 
         if (error != null) {
+            if (error instanceof ClosedChannelException) {
+                // Provide a nice message to the user
+                throw new ExecutionException("Grid is not connected", error);
+            }
             throw new ExecutionException(error);
         }
 

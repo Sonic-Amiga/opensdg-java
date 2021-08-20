@@ -8,6 +8,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousChannelGroup;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.AsynchronousSocketChannel;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.CompletionHandler;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -89,7 +90,7 @@ public abstract class Connection extends IConnection {
     protected int timeout = 10;
 
     private AsynchronousChannelGroup group;
-    private AsynchronousSocketChannel s;
+    private AsynchronousSocketChannel socket;
     protected EncryptedProtocol tunnel;
     private Object writeLock = new Object();
     private Object closeLock = new Object();
@@ -99,8 +100,8 @@ public abstract class Connection extends IConnection {
     protected void openSocket(String host, int port)
             throws IOException, InterruptedException, ExecutionException, TimeoutException {
         group = ChannelGroupHolder.get();
-        s = AsynchronousSocketChannel.open(group);
-        s.connect(new InetSocketAddress(host, port)).get(timeout, TimeUnit.SECONDS);
+        socket = AsynchronousSocketChannel.open(group);
+        socket.connect(new InetSocketAddress(host, port)).get(timeout, TimeUnit.SECONDS);
         logger.debug("Connected to {}:{}", host, port);
     }
 
@@ -118,8 +119,8 @@ public abstract class Connection extends IConnection {
             if (state != State.CLOSED) {
                 handleClose();
                 setState(State.CLOSED);
-                ch = s;
-                s = null;
+                ch = socket;
+                socket = null;
                 group = null;
             }
         }
@@ -139,7 +140,14 @@ public abstract class Connection extends IConnection {
     }
 
     @Override
-    protected void doSendRawData(ByteBuffer data) throws InterruptedException, ExecutionException, TimeoutException {
+    protected void doSendRawData(ByteBuffer data)
+            throws InterruptedException, ExecutionException, TimeoutException, IOException {
+        AsynchronousSocketChannel s = socket;
+
+        if (s == null) {
+            throw new ClosedChannelException();
+        }
+
         int size = data.capacity();
 
         // Binary incompatibility workaround: In Java 9 position() method has been overridden
@@ -164,12 +172,12 @@ public abstract class Connection extends IConnection {
      *
      */
     protected void asyncReceive() {
-        s.read(tunnel.getBuffer(), this, readHandler);
+        socket.read(tunnel.getBuffer(), this, readHandler);
     }
 
     @Override
     protected int doSyncReceive(ByteBuffer buffer) throws InterruptedException, ExecutionException, TimeoutException {
-        return s.read(buffer).get(timeout, TimeUnit.SECONDS);
+        return socket.read(buffer).get(timeout, TimeUnit.SECONDS);
     }
 
     /**

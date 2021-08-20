@@ -55,7 +55,7 @@ public class PairingConnection extends PeerConnection {
                 }
             } while (ret != ReadResult.DONE);
         } catch (Exception e) {
-            setState(State.CLOSED);
+            close();
             throw e;
         }
     }

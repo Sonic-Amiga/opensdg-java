@@ -174,11 +174,17 @@ public class GridConnection extends Connection {
             } catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
                 logger.debug("Failed to connect to {}:{}: {}", randomized[i].host, randomized[i].port, e.getMessage());
                 lastErr = e;
+            } catch (Exception e) {
+                // Anything else is critical; it's probably unchecked, so we don't keep
+                // trying, but still maintaining our state
+                close();
+                throw e;
             }
         }
 
         if (lastErr != null) {
-            setState(State.CLOSED);
+            // We must be ready for reuse, free resources
+            close();
 
             // Java sucks; we have to write these checks or to declare throwing an Exception,
             // which we really don't want to
@@ -191,7 +197,7 @@ public class GridConnection extends Connection {
             } else if (lastErr instanceof TimeoutException) {
                 throw (TimeoutException) lastErr;
             } else {
-                throw new IOException(lastErr.getMessage(), lastErr);
+                throw new IllegalStateException("Unexpected exception: " + lastErr.toString());
             }
         }
     }

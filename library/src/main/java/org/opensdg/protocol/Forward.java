@@ -131,7 +131,8 @@ public class Forward extends RawProtocol {
         return super.establish();
     }
 
-    private void sendPacket(Forward.Packet pkt) throws InterruptedException, ExecutionException, TimeoutException {
+    private void sendPacket(Forward.Packet pkt)
+            throws InterruptedException, ExecutionException, TimeoutException, IOException {
         logger.trace("Sending packet: {}", pkt);
         connection.sendRawData(pkt.getData());
     }

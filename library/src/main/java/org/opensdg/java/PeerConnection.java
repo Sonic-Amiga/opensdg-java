@@ -70,7 +70,8 @@ public class PeerConnection extends Connection {
             PeerReply reply = grid.connectToPeer(peerStr, protocol).get(timeout, TimeUnit.SECONDS);
             startForwarding(reply);
         } catch (Exception e) {
-            setState(State.CLOSED);
+            // We must be ready for reuse, free resources
+            close();
             throw e;
         }
     }

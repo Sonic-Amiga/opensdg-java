@@ -24,10 +24,11 @@ public abstract class IConnection {
      * @throws ExecutionException if the underlying write operation threw an exception
      * @throws InterruptedException if the current thread was interrupted
      * @throws TimeoutException if the operation has timed out
+     * @throws IOException
      *
      */
     protected abstract void doSendRawData(ByteBuffer data)
-            throws InterruptedException, ExecutionException, TimeoutException;
+            throws InterruptedException, ExecutionException, TimeoutException, IOException;
 
     /**
      * Receive raw data synchronously
@@ -70,7 +71,7 @@ public abstract class IConnection {
     protected abstract void onDataPacket(InputStream data)
             throws IOException, InterruptedException, ExecutionException, TimeoutException;
 
-    void sendRawData(ByteBuffer data) throws InterruptedException, ExecutionException, TimeoutException {
+    void sendRawData(ByteBuffer data) throws InterruptedException, ExecutionException, TimeoutException, IOException {
         doSendRawData(data);
     }
 

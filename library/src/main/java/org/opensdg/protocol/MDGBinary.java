@@ -543,7 +543,8 @@ public class MDGBinary extends EncryptedProtocol {
         connection.handleReadyPacket();
     }
 
-    private void sendPacket(MDGBinary.Packet pkt) throws InterruptedException, ExecutionException, TimeoutException {
+    private void sendPacket(MDGBinary.Packet pkt)
+            throws InterruptedException, ExecutionException, TimeoutException, IOException {
         logger.trace("Sending packet: {}", pkt);
         connection.sendRawData(pkt.getData());
     }
