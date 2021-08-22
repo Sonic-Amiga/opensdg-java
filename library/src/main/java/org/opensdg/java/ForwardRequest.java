@@ -4,6 +4,7 @@ import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.opensdg.protocol.generated.ControlProtocol.PeerReply;
 
@@ -69,11 +70,20 @@ class ForwardRequest implements Future<PeerReply> {
         }
 
         if (error != null) {
-            if (error instanceof ClosedChannelException) {
-                // Provide a nice message to the user
-                throw new ExecutionException("Grid is not connected", error);
+            // Provide a nice message to the user
+            String message = error.getMessage();
+
+            if (message == null) {
+                // Some Throwables come without a message
+                if (error instanceof ClosedChannelException) {
+                    message = "Grid is not connected";
+                } else if (error instanceof TimeoutException) {
+                    message = "Grid communication timeout";
+                } else {
+                    message = "Grid connection error: " + error.toString();
+                }
             }
-            throw new ExecutionException(error);
+            throw new ExecutionException(message, error);
         }
 
         return result;
