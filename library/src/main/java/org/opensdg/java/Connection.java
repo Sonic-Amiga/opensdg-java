@@ -120,11 +120,14 @@ public abstract class Connection extends IConnection {
         synchronized (closeLock) {
             if (state != State.CLOSED) {
                 handleClose();
-                setState(State.CLOSED);
                 ch = socket;
                 grp = group;
                 socket = null;
                 group = null;
+                // Set the new state after all the cleanup has been done. This prevents
+                // reconnecting, which may be running in a concurrent thread, from getting
+                // a "half-closed" connection
+                setState(State.CLOSED);
             }
         }
 
@@ -208,8 +211,9 @@ public abstract class Connection extends IConnection {
             // during pending read
             logger.debug("Async channel closed");
         } else {
-            onError(exc);
+            // The user may want to reconnect in onError(), so close first
             close();
+            onError(exc);
         }
     }
 
