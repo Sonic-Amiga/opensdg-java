@@ -1,6 +1,7 @@
 package org.opensdg.java;
 
 import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ProtocolException;
@@ -432,5 +433,10 @@ public class GridConnection extends Connection {
      */
     public void setPingInterval(int seconds) {
         pingInterval = seconds;
+    }
+
+    @Override
+    protected EOFException getEOFException() {
+        return new EOFException("Connection closed by grid");
     }
 }

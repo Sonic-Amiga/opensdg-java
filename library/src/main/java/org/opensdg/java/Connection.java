@@ -46,7 +46,7 @@ public abstract class Connection extends IConnection {
 
                 switch (ret) {
                     case EOF:
-                        conn.handleError(getEOFException());
+                        conn.handleError(conn.getEOFException());
                         return;
                     case DONE:
                         conn.tunnel.onPacketReceived();
@@ -82,7 +82,7 @@ public abstract class Connection extends IConnection {
         DONE
     }
 
-    protected static EOFException getEOFException() {
+    protected EOFException getEOFException() {
         return new EOFException("Connection closed by peer");
     }
 
