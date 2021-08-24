@@ -206,6 +206,7 @@ public abstract class Connection extends IConnection {
      * @param exc Error description
      */
     protected void handleError(Throwable exc) {
+        tunnel.handleError();
         if (exc instanceof AsynchronousCloseException) {
             // This is not really an error, just someone has called close()
             // during pending read
