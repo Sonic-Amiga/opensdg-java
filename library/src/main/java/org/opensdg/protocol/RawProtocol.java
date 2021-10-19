@@ -43,14 +43,7 @@ public abstract class RawProtocol {
         ReadResult ret;
 
         do {
-            int size;
-
-            try {
-                size = connection.syncReceive(getBuffer());
-            } catch (InterruptedException | ExecutionException | TimeoutException e) {
-                receiveBuffer = null;
-                throw e;
-            }
+            int size = connection.syncReceive(getBuffer());
 
             ret = onRawDataReceived(size);
         } while (ret == ReadResult.CONTINUE);

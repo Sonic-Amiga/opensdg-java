@@ -38,8 +38,7 @@ public abstract class EncryptedProtocol extends RawProtocol {
      * @throws InterruptedException if the current thread was interrupted
      * @throws TimeoutException if the operation has timed out
      */
-    abstract public void sendData(byte[] data)
-            throws IOException, InterruptedException, ExecutionException, TimeoutException;
+    abstract public void sendData(byte[] data) throws IOException;
 
     /**
      * Get received data

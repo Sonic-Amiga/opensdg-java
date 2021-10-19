@@ -3,15 +3,14 @@ package org.opensdg.java;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketException;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
-import java.nio.channels.AsynchronousChannelGroup;
 import java.nio.channels.AsynchronousCloseException;
-import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.CompletionHandler;
+import java.nio.channels.SocketChannel;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.eclipse.jdt.annotation.NonNull;
@@ -89,21 +88,17 @@ public abstract class Connection extends IConnection {
     private State state = State.CLOSED;
     protected int timeout = 10;
 
-    private AsynchronousChannelGroup group;
-    private AsynchronousSocketChannel socket;
+    private SocketChannel socket;
     protected EncryptedProtocol tunnel;
     private Object writeLock = new Object();
     private Object closeLock = new Object();
 
     private CompletionHandler<Integer, Connection> readHandler = new ReadHandler();
 
-    protected void openSocket(String host, int port)
-            throws IOException, InterruptedException, ExecutionException, TimeoutException {
-        if (group == null) {
-            group = ChannelGroupHolder.get();
-        }
-        socket = AsynchronousSocketChannel.open(group);
-        socket.connect(new InetSocketAddress(host, port)).get(timeout, TimeUnit.SECONDS);
+    protected void openSocket(String host, int port) throws IOException {
+        socket = SocketChannel.open();
+        socket.socket().setSoTimeout(timeout * 1000);
+        socket.connect(new InetSocketAddress(host, port));
         logger.debug("Connected to {}:{}", host, port);
     }
 
@@ -114,16 +109,13 @@ public abstract class Connection extends IConnection {
      * connection, it will do nothing. A closed {@link Connection} object can be reused.
      */
     public void close() {
-        AsynchronousSocketChannel ch = null;
-        AsynchronousChannelGroup grp = null;
+        SocketChannel ch = null;
 
         synchronized (closeLock) {
             if (state != State.CLOSED) {
                 handleClose();
                 ch = socket;
-                grp = group;
                 socket = null;
-                group = null;
                 // Set the new state after all the cleanup has been done. This prevents
                 // reconnecting, which may be running in a concurrent thread, from getting
                 // a "half-closed" connection
@@ -134,9 +126,6 @@ public abstract class Connection extends IConnection {
         if (ch != null) {
             safeClose(ch);
         }
-        if (grp != null) {
-            ChannelGroupHolder.put();
-        }
     }
 
     protected void closeOnlySocket() {
@@ -144,7 +133,7 @@ public abstract class Connection extends IConnection {
         socket = null;
     }
 
-    protected void safeClose(AsynchronousSocketChannel ch) {
+    protected void safeClose(SocketChannel ch) {
         try {
             ch.close();
         } catch (IOException e) {
@@ -158,9 +147,8 @@ public abstract class Connection extends IConnection {
     }
 
     @Override
-    protected void doSendRawData(ByteBuffer data)
-            throws InterruptedException, ExecutionException, TimeoutException, IOException {
-        AsynchronousSocketChannel s = socket;
+    protected void doSendRawData(ByteBuffer data) throws IOException {
+        SocketChannel s = socket;
 
         if (s == null) {
             throw new ClosedChannelException();
@@ -176,7 +164,7 @@ public abstract class Connection extends IConnection {
 
         synchronized (writeLock) {
             while (size > 0) {
-                int ret = s.write(data).get(timeout, TimeUnit.SECONDS);
+                int ret = s.write(data);
                 size -= ret;
             }
         }
@@ -190,12 +178,13 @@ public abstract class Connection extends IConnection {
      *
      */
     protected void asyncReceive() {
-        socket.read(tunnel.getBuffer(), this, readHandler);
+        logger.error("Connection.asyncReceive() is not implemented yet");
+        // socket.read(tunnel.getBuffer(), this, readHandler);
     }
 
     @Override
-    protected int doSyncReceive(ByteBuffer buffer) throws InterruptedException, ExecutionException, TimeoutException {
-        return socket.read(buffer).get(timeout, TimeUnit.SECONDS);
+    protected int doSyncReceive(ByteBuffer buffer) throws IOException {
+        return socket.read(buffer);
     }
 
     /**
@@ -280,6 +269,17 @@ public abstract class Connection extends IConnection {
      * @param seconds timeout value in seconds
      */
     public void setTimeout(int seconds) {
+        SocketChannel s = socket;
+
+        if (s != null) {
+            try {
+                s.socket().setSoTimeout(seconds * 1000);
+            } catch (SocketException e) {
+                // This should never happen
+                logger.error("setSoTimeout() failed: {}", e.toString());
+            }
+        }
+
         timeout = seconds;
     }
 }

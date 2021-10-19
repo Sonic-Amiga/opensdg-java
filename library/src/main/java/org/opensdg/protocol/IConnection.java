@@ -27,8 +27,7 @@ public abstract class IConnection {
      * @throws IOException
      *
      */
-    protected abstract void doSendRawData(ByteBuffer data)
-            throws InterruptedException, ExecutionException, TimeoutException, IOException;
+    protected abstract void doSendRawData(ByteBuffer data) throws IOException;
 
     /**
      * Receive raw data synchronously
@@ -40,9 +39,9 @@ public abstract class IConnection {
      * @throws ExecutionException if the underlying write operation threw an exception
      * @throws InterruptedException if the current thread was interrupted
      * @throws TimeoutException if the operation has timed out
+     * @throws IOException
      */
-    protected abstract int doSyncReceive(ByteBuffer buffer)
-            throws InterruptedException, ExecutionException, TimeoutException;
+    protected abstract int doSyncReceive(ByteBuffer buffer) throws IOException;
 
     /**
      * Handle "Protocol ready" packet
@@ -54,8 +53,7 @@ public abstract class IConnection {
      * @throws InterruptedException if the current thread was interrupted
      * @throws TimeoutException if the operation has timed out
      */
-    protected abstract void onReadyPacket()
-            throws IOException, InterruptedException, ExecutionException, TimeoutException;
+    protected abstract void onReadyPacket() throws IOException;
 
     /**
      * Handle incoming data packet
@@ -68,23 +66,21 @@ public abstract class IConnection {
      * @throws InterruptedException if the current thread was interrupted
      * @throws TimeoutException if the operation has timed out
      */
-    protected abstract void onDataPacket(InputStream data)
-            throws IOException, InterruptedException, ExecutionException, TimeoutException;
+    protected abstract void onDataPacket(InputStream data) throws IOException;
 
-    void sendRawData(ByteBuffer data) throws InterruptedException, ExecutionException, TimeoutException, IOException {
+    void sendRawData(ByteBuffer data) throws IOException {
         doSendRawData(data);
     }
 
-    int syncReceive(ByteBuffer buffer) throws InterruptedException, ExecutionException, TimeoutException {
+    int syncReceive(ByteBuffer buffer) throws IOException {
         return doSyncReceive(buffer);
     }
 
-    void handleReadyPacket() throws IOException, InterruptedException, ExecutionException, TimeoutException {
+    void handleReadyPacket() throws IOException {
         onReadyPacket();
     }
 
-    void handleDataPacket(InputStream data)
-            throws IOException, InterruptedException, ExecutionException, TimeoutException {
+    void handleDataPacket(InputStream data) throws IOException {
         onDataPacket(data);
     }
 }

@@ -543,8 +543,7 @@ public class MDGBinary extends EncryptedProtocol {
         connection.handleReadyPacket();
     }
 
-    private void sendPacket(MDGBinary.Packet pkt)
-            throws InterruptedException, ExecutionException, TimeoutException, IOException {
+    private void sendPacket(MDGBinary.Packet pkt) throws IOException {
         logger.trace("Sending packet: {}", pkt);
         connection.sendRawData(pkt.getData());
     }
@@ -564,7 +563,7 @@ public class MDGBinary extends EncryptedProtocol {
     }
 
     @Override
-    public void sendData(byte[] data) throws IOException, InterruptedException, ExecutionException, TimeoutException {
+    public void sendData(byte[] data) throws IOException {
         // We can be called by arbitrary number of threads, but we need to make sure
         // that packets are sent in the order of their nonces. Our remote peer simply
         // hangs up if we fail to do so

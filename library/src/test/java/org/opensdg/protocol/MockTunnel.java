@@ -36,7 +36,7 @@ public class MockTunnel extends EncryptedProtocol {
     }
 
     @Override
-    public void sendData(byte[] data) throws ProtocolException, IOException, InterruptedException, ExecutionException {
+    public void sendData(byte[] data) throws IOException {
         // TODO Auto-generated method stub
 
     }

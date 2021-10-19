@@ -53,7 +53,7 @@ public class GridConnection extends Connection {
 
             try {
                 GridConnection.this.ping();
-            } catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
+            } catch (IOException e) {
                 GridConnection.this.handleError(e);
             }
         }
@@ -208,7 +208,7 @@ public class GridConnection extends Connection {
     }
 
     @Override
-    protected void onReadyPacket() throws IOException, InterruptedException, ExecutionException, TimeoutException {
+    protected void onReadyPacket() throws IOException {
         // At this point the grid seems to be ready and subsequent steps are
         // probably optional. But let's do them just in case, to be as close
         // to original implementation as possible.
@@ -223,8 +223,7 @@ public class GridConnection extends Connection {
     }
 
     @Override
-    protected void onDataPacket(InputStream data)
-            throws IOException, InterruptedException, ExecutionException, TimeoutException {
+    protected void onDataPacket(InputStream data) throws IOException {
         int msgType = data.read();
 
         switch (msgType) {
@@ -298,7 +297,7 @@ public class GridConnection extends Connection {
         }
     }
 
-    private void ping() throws IOException, InterruptedException, ExecutionException, TimeoutException {
+    private void ping() throws IOException {
         Ping.Builder ping = Ping.newBuilder();
 
         ping.setSeq(pingSequence++);
@@ -311,8 +310,7 @@ public class GridConnection extends Connection {
         sendMESG(Control.MSG_PING, ping.build());
     }
 
-    private void sendMESG(byte cmd, AbstractMessage msg)
-            throws IOException, InterruptedException, ExecutionException, TimeoutException {
+    private void sendMESG(byte cmd, AbstractMessage msg) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream(1 + msg.getSerializedSize());
 
         // The protobuf contents is prefixed by a packet ID
@@ -368,7 +366,7 @@ public class GridConnection extends Connection {
     void sendFwdReq(ForwardRequest request, byte cmd, AbstractMessage msg) {
         try {
             sendMESG(cmd, msg);
-        } catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
+        } catch (IOException e) {
             synchronized (forwardQueue) {
                 forwardQueue.remove(request);
             }
