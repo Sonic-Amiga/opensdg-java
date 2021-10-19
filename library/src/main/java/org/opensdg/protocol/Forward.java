@@ -138,8 +138,7 @@ public class Forward extends RawProtocol {
     }
 
     @Override
-    protected ReadResult onPacketReceived(ByteBuffer data)
-            throws IOException, InterruptedException, ExecutionException {
+    protected ReadResult onPacketReceived(ByteBuffer data) throws IOException {
         byte cmd = data.get(2);
 
         switch (cmd) {

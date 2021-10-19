@@ -8,9 +8,6 @@ import java.net.ProtocolException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.eclipse.jdt.annotation.NonNull;
@@ -35,29 +32,12 @@ import com.google.protobuf.AbstractMessage;
 public class GridConnection extends Connection {
     private final Logger logger = LoggerFactory.getLogger(GridConnection.class);
 
-    private int pingInterval = 30;
+    private int pingInterval = 10;
     private int pingSequence;
     private int pingDelay;
-    private long lastPing;
-
-    private ScheduledExecutorService pingScheduler;
-    private boolean ownScheduler;
-    private ScheduledFuture<?> scheduledPing;
+    private long lastPing = 0;
 
     private @NonNull ArrayList<ForwardRequest> forwardQueue = new ArrayList<ForwardRequest>();
-
-    private Runnable pingTask = new Runnable() {
-        @Override
-        public void run() {
-            GridConnection.this.scheduledPing = null;
-
-            try {
-                GridConnection.this.ping();
-            } catch (IOException e) {
-                GridConnection.this.handleError(e);
-            }
-        }
-    };
 
     public static class Endpoint {
         String host;
@@ -88,27 +68,6 @@ public class GridConnection extends Connection {
      */
     public GridConnection(byte[] key) {
         tunnel = new MDGBinary(this, key);
-        ownScheduler = true;
-    }
-
-    /**
-     * Creates a {@link GridConnection} with the given private key and own task scheduler
-     *
-     * The private key is used for connection encryption. The public key,
-     * also known as a peer ID, used to identify a host on the Grid, is also
-     * derived from the given private key
-     *
-     * A given {@link ScheduledExecutorService} will be used instead of internally provided one
-     * to schedule ping requests. This constructor is intended for use if a ScheduledExecutorService
-     * is already provided by the environment, e. g. OpenHAB.
-     *
-     * @param key a private key to use
-     * @param scheduler a ScheduledExecutorService
-     */
-    public GridConnection(byte[] key, ScheduledExecutorService scheduler) {
-        tunnel = new MDGBinary(this, key);
-        pingScheduler = scheduler;
-        ownScheduler = false;
     }
 
     /**
@@ -144,10 +103,6 @@ public class GridConnection extends Connection {
         setState(State.CONNECTING);
         pingSequence = 0;
         pingDelay = -1;
-
-        if (ownScheduler) {
-            pingScheduler = PingExecutorHolder.get();
-        }
 
         for (int i = 0; i < servers.length; i++) {
             try {
@@ -256,7 +211,6 @@ public class GridConnection extends Connection {
                 if (pong.getSeq() == pingSequence - 1) {
                     pingDelay = (int) (Calendar.getInstance().getTimeInMillis() - lastPing);
                     logger.debug("PING roundtrip {} ms", pingDelay);
-                    scheduledPing = pingScheduler.schedule(pingTask, pingInterval, TimeUnit.SECONDS);
                 }
 
                 break;
@@ -297,7 +251,7 @@ public class GridConnection extends Connection {
         }
     }
 
-    private void ping() throws IOException {
+    void ping() throws IOException {
         Ping.Builder ping = Ping.newBuilder();
 
         ping.setSeq(pingSequence++);
@@ -376,9 +330,6 @@ public class GridConnection extends Connection {
 
     @Override
     protected void handleError(Throwable t) {
-        // Stop pinging
-        stopPing();
-
         // Report all pending ForwardRequests as failed
         ArrayList<ForwardRequest> queue;
 
@@ -392,26 +343,6 @@ public class GridConnection extends Connection {
         }
 
         super.handleError(t);
-    }
-
-    @Override
-    protected void handleClose() {
-        // We need also to stop PINGs on close
-        stopPing();
-
-        if (ownScheduler) {
-            pingScheduler = null;
-            PingExecutorHolder.put();
-        }
-    }
-
-    private void stopPing() {
-        ScheduledFuture<?> pendingPing = scheduledPing;
-        scheduledPing = null;
-
-        if (pendingPing != null) {
-            pendingPing.cancel(true);
-        }
     }
 
     /**
@@ -436,5 +367,17 @@ public class GridConnection extends Connection {
     @Override
     protected EOFException getEOFException() {
         return new EOFException("Connection closed by grid");
+    }
+
+    long getLastPing() {
+        return lastPing;
+    }
+
+    void asyncPing() {
+        try {
+            ping();
+        } catch (IOException e) {
+            handleError(e);
+        }
     }
 }

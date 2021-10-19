@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.ProtocolException;
 import java.nio.ByteBuffer;
-import java.util.concurrent.ExecutionException;
 
 import org.opensdg.java.Connection;
 import org.opensdg.java.Connection.ReadResult;
@@ -29,8 +28,7 @@ public class MockTunnel extends EncryptedProtocol {
     }
 
     @Override
-    protected ReadResult onPacketReceived(ByteBuffer data)
-            throws IOException, InterruptedException, ExecutionException {
+    protected ReadResult onPacketReceived(ByteBuffer data) throws IOException {
         // TODO Auto-generated method stub
         return null;
     }

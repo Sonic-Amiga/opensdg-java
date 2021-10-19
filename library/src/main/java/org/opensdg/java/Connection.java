@@ -8,7 +8,6 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedChannelException;
-import java.nio.channels.CompletionHandler;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
@@ -37,38 +36,6 @@ import org.slf4j.LoggerFactory;
 public abstract class Connection extends IConnection {
     private final Logger logger = LoggerFactory.getLogger(Connection.class);
 
-    private static class ReadHandler implements CompletionHandler<Integer, Connection> {
-        @Override
-        public void completed(Integer result, Connection conn) {
-            try {
-                ReadResult ret = conn.tunnel.onRawDataReceived(result);
-
-                switch (ret) {
-                    case EOF:
-                        conn.handleError(conn.getEOFException());
-                        return;
-                    case DONE:
-                        conn.tunnel.onPacketReceived();
-                        break;
-                    case CONTINUE:
-                        break;
-
-                }
-                // Continue receiving if not closed
-                if (conn.state != State.CLOSED) {
-                    conn.asyncReceive();
-                }
-            } catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
-                conn.handleError(e);
-            }
-        }
-
-        @Override
-        public void failed(Throwable exc, Connection conn) {
-            conn.handleError(exc);
-        }
-    }
-
     public enum State {
         CLOSED,
         CONNECTING,
@@ -92,8 +59,6 @@ public abstract class Connection extends IConnection {
     protected EncryptedProtocol tunnel;
     private Object writeLock = new Object();
     private Object closeLock = new Object();
-
-    private CompletionHandler<Integer, Connection> readHandler = new ReadHandler();
 
     protected void openSocket(String host, int port) throws IOException {
         socket = SocketChannel.open();
@@ -178,8 +143,7 @@ public abstract class Connection extends IConnection {
      *
      */
     protected void asyncReceive() {
-        logger.error("Connection.asyncReceive() is not implemented yet");
-        // socket.read(tunnel.getBuffer(), this, readHandler);
+        SocketThread.get().sendRequest(SocketThread.Action.ADD_SOCKET, this);
     }
 
     @Override
@@ -281,5 +245,29 @@ public abstract class Connection extends IConnection {
         }
 
         timeout = seconds;
+    }
+
+    SocketChannel getSocket() {
+        return socket;
+    }
+
+    void onAsyncRead() {
+        try {
+            int len = socket.read(tunnel.getBuffer());
+            ReadResult ret = tunnel.onRawDataReceived(len);
+
+            switch (ret) {
+                case EOF:
+                    handleError(getEOFException());
+                    return;
+                case DONE:
+                    tunnel.onPacketReceived();
+                    break;
+                case CONTINUE:
+                    break;
+            }
+        } catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
+            handleError(e);
+        }
     }
 }
