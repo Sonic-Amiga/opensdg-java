@@ -276,7 +276,7 @@ public class MDGBinary extends EncryptedProtocol {
         }
     }
 
-    private static class HELOPacket extends Packet {
+    static class HELOPacket extends Packet {
         public static final int ZEROMSG_SIZE = 80;
 
         public HELOPacket(byte[] serverPk, byte[] clientPk, byte[] clientSk, long nonce) throws ProtocolException {
