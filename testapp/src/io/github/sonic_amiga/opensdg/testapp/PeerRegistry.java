@@ -2,10 +2,9 @@ package io.github.sonic_amiga.opensdg.testapp;
 
 import java.util.ArrayList;
 
-import javax.xml.bind.DatatypeConverter;
-
 import org.opensdg.java.Connection;
 import org.opensdg.java.PeerConnection;
+import org.opensdg.java.SDG;
 
 /**
  * This class assigns numbers to connections for user's convenience
@@ -43,7 +42,9 @@ public class PeerRegistry {
             Connection conn = list.get(i);
 
             if (conn != null) {
-                System.out.println("#" + i + "\t" + DatatypeConverter.printHexBinary(list.get(i).getPeerId()));
+                byte[] peerId = list.get(i).getPeerId();
+                String peerIdStr = peerId == null ? "<null>" : SDG.bin2hex(peerId);
+                System.out.println("#" + i + "\t" + peerIdStr);
             }
         }
     }

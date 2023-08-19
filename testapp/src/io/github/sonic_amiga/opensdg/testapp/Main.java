@@ -9,8 +9,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.HashMap;
 
-import javax.xml.bind.DatatypeConverter;
-
 import org.opensdg.java.GridConnection;
 import org.opensdg.java.SDG;
 
@@ -52,14 +50,14 @@ public class Main {
             len = f.read(privKey);
             f.close();
 
-            System.out.println("Loaded private key: " + DatatypeConverter.printHexBinary(privKey));
+            System.out.println("Loaded private key: " + SDG.bin2hex(privKey));
         } catch (IOException e) {
             // Nothing to do
         }
 
         if (len != SDG.KEY_SIZE) {
             privKey = SDG.createPrivateKey();
-            System.out.println("Created new private key: " + DatatypeConverter.printHexBinary(privKey));
+            System.out.println("Created new private key: " + SDG.bin2hex(privKey));
 
             try {
                 OutputStream f = new FileOutputStream("osdg_test_private_key.bin");

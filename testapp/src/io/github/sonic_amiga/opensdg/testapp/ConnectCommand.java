@@ -1,8 +1,7 @@
 package io.github.sonic_amiga.opensdg.testapp;
 
-import javax.xml.bind.DatatypeConverter;
-
 import org.opensdg.java.PeerConnection;
+import org.opensdg.java.SDG;
 
 public class ConnectCommand extends CommandHandler {
 
@@ -19,7 +18,7 @@ public class ConnectCommand extends CommandHandler {
             return;
         }
 
-        byte[] peerId = DatatypeConverter.parseHexBinary(command[1]);
+        byte[] peerId = SDG.hex2bin(command[1]);
         String protocol = command.length > 2 ? command[2] : "dominion-1.0";
 
         PeerConnection conn = new PeerConnection();

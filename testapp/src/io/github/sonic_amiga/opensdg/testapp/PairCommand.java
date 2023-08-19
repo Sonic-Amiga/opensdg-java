@@ -2,10 +2,9 @@ package io.github.sonic_amiga.opensdg.testapp;
 
 import java.io.DataInputStream;
 
-import javax.xml.bind.DatatypeConverter;
-
 import org.opensdg.java.PairingConnection;
 import org.opensdg.java.PeerConnection;
+import org.opensdg.java.SDG;
 
 import com.google.gson.Gson;
 
@@ -48,7 +47,13 @@ public class PairCommand extends CommandHandler {
 
         byte[] peerId = pairingConn.getPeerId();
 
-        System.out.println("Pairing successful, peer ID is " + DatatypeConverter.printHexBinary(peerId));
+        if (peerId == null) {
+            // This will never happen, just satisfy the null checker
+            System.err.print("Unexpected: getPeerId() returns null");
+            return;
+        }
+
+        System.out.println("Pairing successful, peer ID is " + SDG.bin2hex(peerId));
         try {
             pairingConn.close();
         } catch (Exception e) {
@@ -68,7 +73,15 @@ public class PairCommand extends CommandHandler {
             return;
         }
 
-        String myPeerId = DatatypeConverter.printHexBinary(Main.grid.getMyPeerId()).toLowerCase();
+        byte[] myId = Main.grid.getMyPeerId();
+
+        if (myId == null) {
+            // This will never happen, just satisfy the null checker
+            System.err.print("Unexpected: getMyPeerId() returns null");
+            return;
+        }
+
+        String myPeerId = SDG.bin2hex(myId).toLowerCase();
         ConfigRequest request = new ConfigRequest("OSDG-Java test", myPeerId);
         String json = gson.toJson(request);
 
