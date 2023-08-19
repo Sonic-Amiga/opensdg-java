@@ -3,8 +3,8 @@
 
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>org.opensdg</groupId>
-  <artifactId>testapp</artifactId>
+  <groupId>io.github.sonic_amiga</groupId>
+  <artifactId>opensdg_testapp</artifactId>
   <version>1.0</version>
 
   <name>OpenSDG :: Java :: Test application</name>

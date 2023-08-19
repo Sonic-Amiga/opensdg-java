@@ -1,6 +1,6 @@
 syntax = "proto2";
 
-package org.opensdg.protocol.generated;
+package io.github.sonic_amiga.opensdg.protocol.generated;
 
 // MSG_PROTOCOL_VERSION
 message Property

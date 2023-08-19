@@ -3,8 +3,8 @@
 
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>org.opensdg</groupId>
-  <artifactId>osdg_java</artifactId>
+  <groupId>io.github.sonic-amiga</groupId>
+  <artifactId>opensdg_java</artifactId>
   <version>1.0</version>
   <packaging>jar</packaging>
 
@@ -108,7 +108,7 @@
           <bnd><![CDATA[
 Bundle-SymbolicName: ${project.groupId}.${project.artifactId}
 Bundle-Version: ${project.version}
--exportcontents: org.opensdg.java;version="${project.version}"
+-exportcontents: io.github.sonic_amiga.opensdg.java;version="${project.version}"
 ]]>
           </bnd>
         </configuration>
